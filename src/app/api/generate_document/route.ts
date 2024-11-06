@@ -19,18 +19,18 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // 渲染模板的变量，使用请求传入的数据
     doc.render({
-        发放时间_en: data.发放时间_en,
-        详细地址_en: data.详细地址_en,
-        城市_en: data.城市_en,
-        省份_en: data.省份_en,
-        邮编: data.邮编,
-        国家_en: data.国家_en,
-        姓名_en: data.姓名_en,
-        学生学号: data.学生学号,
-        项目名称: data.项目名称,
-        开始时间_en: data.开始时间_en,
-        结束时间_en: data.结束时间_en,
-        实际价格_美元: data.实际价格_美元,
+        发放时间_en: data.issuanceDate,        // 发放时间
+        详细地址_en: data.address,              // 详细地址
+        城市_en: data.city,                     // 城市
+        省份_en: data.state,                    // 省份
+        邮编: data.postalCode,                  // 邮编
+        国家_en: data.country,                  // 国家
+        姓名_en: data.name,                     // 姓名
+        学生学号: data.studentID,               // 学生学号
+        项目名称: data.programName,             // 项目名称
+        开始时间_en: data.startDate,            // 开始时间
+        结束时间_en: data.endDate,              // 结束时间
+        实际价格_美元: data.tuitionFeeUSD       // 实际价格（美元）
     });
 
     // 生成文档为 buffer
