@@ -2,7 +2,7 @@
  * @Author: 杨仕明 shiming.y@qq.com
  * @Date: 2024-11-06 18:28:01
  * @LastEditors: 杨仕明 shiming.y@qq.com
- * @LastEditTime: 2024-11-06 18:32:52
+ * @LastEditTime: 2024-11-06 18:53:34
  * @FilePath: /next_word_auto/src/components/HomeContent.tsx
  * @Description: 
  * 
@@ -12,6 +12,22 @@
 
 import { useState } from "react";
 import { saveAs } from "file-saver";
+
+// 定义 formData 的类型
+interface FormDataType {
+    issuanceDate: string;
+    address: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+    name: string;
+    studentID: string;
+    programName: string;
+    startDate: string;
+    endDate: string;
+    tuitionFeeUSD: string;
+}
 
 // 所有国家名称列表
 const countries = [
@@ -39,7 +55,7 @@ const countries = [
 
 // 同样使用之前的代码，不再重复代码示例
 export default function HomeContent() {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<FormDataType>({
         name: "",                     // 姓名
         country: "China",     // 国家，默认值
         state: "",                    // 省份
@@ -71,9 +87,9 @@ export default function HomeContent() {
     const generateDocument = async () => {
         const formattedData = {
             ...formData,
-            开始时间_en: formatDate(formData.issuanceDate),
-            结束时间_en: formatDate(formData.startDate),
-            发放时间_en: formatDate(formData.endDate),
+            issuanceDate: formatDate(formData.issuanceDate),
+            startDate: formatDate(formData.startDate),
+            endDate: formatDate(formData.endDate),
         };
 
         try {
@@ -120,7 +136,7 @@ export default function HomeContent() {
                             <input
                                 type={key.includes("Date") ? "date" : "text"}
                                 name={key}
-                                value={(formData as any)[key]}
+                                value={(formData as unknown as Record<string, string>)[key]} // 使用类型断言替代 any
                                 onChange={handleChange}
                                 style={{
                                     padding: "0.5rem",
