@@ -10,8 +10,9 @@
  */
 'use client';
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { saveAs } from "file-saver";
+import Link from 'next/link';
 
 // 定义 formData 的类型
 interface FormDataType {
@@ -70,6 +71,8 @@ export default function HomeContent() {
         tuitionFeeUSD: "",            // 实际价格（美元）
     });
 
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -84,7 +87,17 @@ export default function HomeContent() {
         return new Date(dateString).toLocaleDateString('en-US', options);
     };
 
+    const validateForm = () => {
+        // 在这里添加表单验证逻辑
+        return true;
+    };
+
     const generateDocument = async () => {
+        if (!validateForm()) return;
+
+        setIsLoading(true);
+        setError(null);
+
         const formattedData = {
             ...formData,
             issuanceDate: formatDate(formData.issuanceDate),
@@ -93,23 +106,54 @@ export default function HomeContent() {
         };
 
         try {
-            const response = await fetch("/api/generate_document", {  // 更新为新的API路径
+            console.log('Sending request with data:', formattedData);
+
+            const response = await fetch("/api/generate_document", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(formattedData),
             });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('Server error:', errorData);
+                throw new Error(errorData.error || `Server error: ${response.status}`);
+            }
+
+            console.log('Response received:', response);
             const blob = await response.blob();
-            saveAs(blob, "Lulab_invioce_" + formattedData.name + ".docx");
-        } catch (error) {
+            
+            if (blob.size === 0) {
+                throw new Error('Generated PDF is empty');
+            }
+            
+            console.log('Blob created:', blob);
+            saveAs(blob, `Lulab_invioce_${formattedData.name}.pdf`);
+        } catch (error: any) {
             console.error("Error generating document:", error);
+            setError(
+                error.message || 
+                "Failed to generate document. Please check your input and try again. " +
+                "If the problem persists, contact support."
+            );
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
         <main style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Arial, sans-serif", marginTop: "2rem" }}>
-            <h1 style={{ fontSize: "2rem", color: "#333", marginBottom: "1rem" }}>Generate Admission Offer Letter</h1>
+            <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                width: "100%", 
+                maxWidth: "500px", 
+                marginBottom: "2rem" 
+            }}>
+                <h1 style={{ fontSize: "2rem", color: "#333" }}>Generate Admission Offer Letter</h1>
+            </div>
             <form style={{ maxWidth: "500px", width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
                 {Object.keys(formData).map((key) => (
                     <div key={key} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -152,6 +196,7 @@ export default function HomeContent() {
                 <button
                     type="button"
                     onClick={generateDocument}
+                    disabled={isLoading}
                     style={{
                         padding: "0.75rem",
                         backgroundColor: "#0070f3",
