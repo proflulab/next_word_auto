@@ -11,7 +11,6 @@
 'use client';
 
 import { useState } from "react";
-import { saveAs } from "file-saver";
 
 // 定义 formData 的类型
 interface FormDataType {
@@ -53,7 +52,6 @@ const countries = [
     "Zambia", "Zimbabwe"
 ];
 
-// 同样使用之前的代码，不再重复代码示例
 export default function HomeContent() {
     const [formData, setFormData] = useState<FormDataType>({
         name: "",                     // 姓名
@@ -70,6 +68,7 @@ export default function HomeContent() {
         tuitionFeeUSD: "",            // 实际价格（美元）
     });
 
+    const [generating, setGenerating] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -80,90 +79,222 @@ export default function HomeContent() {
     };
 
     const formatDate = (dateString: string) => {
-        const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: '2-digit' };
-        return new Date(dateString).toLocaleDateString('en-US', options);
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) {
+                throw new Error('Invalid date');
+            }
+            
+            const months = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+            ];
+            
+            const day = date.getDate();
+            const month = months[date.getMonth()];
+            const year = date.getFullYear();
+            
+            // Format: "December 7, 2024"
+            return `${month} ${day}, ${year}`;
+        } catch (error) {
+            console.error('Error formatting date:', error);
+            return dateString; // 返回原始日期字符串以防格式化失败
+        }
     };
 
     const generateDocument = async () => {
-        const formattedData = {
-            ...formData,
-            issuanceDate: formatDate(formData.issuanceDate),
-            startDate: formatDate(formData.startDate),
-            endDate: formatDate(formData.endDate),
-        };
+        if (generating) return;
 
         try {
-            const response = await fetch("/api/generate_document", {  // 更新为新的API路径
+            // 验证所有必填字段
+            const requiredFields = [
+                'name', 'country', 'state', 'city', 'postalCode',
+                'address', 'studentID', 'programName', 'issuanceDate',
+                'startDate', 'endDate', 'tuitionFeeUSD'
+            ];
+
+            const missingFields = requiredFields.filter(field => !formData[field as keyof FormDataType]);
+            if (missingFields.length > 0) {
+                throw new Error(`Please fill in all required fields: ${missingFields.join(', ')}`);
+            }
+            
+            setGenerating(true);
+
+            // 验证日期格式
+            const dateFields = ['issuanceDate', 'startDate', 'endDate'];
+            for (const field of dateFields) {
+                const dateValue = formData[field as keyof FormDataType];
+                if (!dateValue) {
+                    throw new Error(`${field} is required`);
+                }
+                const date = new Date(dateValue);
+                if (isNaN(date.getTime())) {
+                    throw new Error(`Invalid date format for ${field}`);
+                }
+            }
+
+            // 格式化日期
+            const formattedData = {
+                ...formData,
+                issuanceDate: formatDate(formData.issuanceDate),
+                startDate: formatDate(formData.startDate),
+                endDate: formatDate(formData.endDate),
+            };
+
+            console.log('Formatted data:', formattedData); // 添加日志以检查格式化后的数据
+
+            const response = await fetch("/api/generate_document", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(formattedData),
             });
+
+            const contentType = response.headers.get("content-type");
+            
+            if (!response.ok) {
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to generate document');
+                }
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            if (!contentType || !contentType.includes('application/pdf')) {
+                throw new Error('Server did not return a PDF file');
+            }
+
+            const contentDisposition = response.headers.get('content-disposition');
+            const filename = contentDisposition
+                ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+                : `Lulab_invoice_${formData.name}.pdf`;
+
             const blob = await response.blob();
-            saveAs(blob, "Lulab_invioce_" + formattedData.name + ".docx");
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
         } catch (error) {
             console.error("Error generating document:", error);
+            alert(error instanceof Error ? error.message : "An unexpected error occurred");
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const getAutoComplete = (key: string): string => {
+        switch (key) {
+            case 'name':
+                return 'name';
+            case 'address':
+                return 'street-address';
+            case 'city':
+                return 'address-level2';
+            case 'state':
+                return 'address-level1';
+            case 'country':
+                return 'country';
+            case 'postalCode':
+                return 'postal-code';
+            case 'studentID':
+                return 'username';
+            default:
+                return 'off';
         }
     };
 
     return (
         <main style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Arial, sans-serif", marginTop: "2rem" }}>
             <h1 style={{ fontSize: "2rem", color: "#333", marginBottom: "1rem" }}>Generate Admission Offer Letter</h1>
-            <form style={{ maxWidth: "500px", width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                {Object.keys(formData).map((key) => (
-                    <div key={key} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        <label style={{ fontWeight: "bold", color: "#555" }}>{key}</label>
-                        {key === "country" ? (
-                            <select
-                                name={key}
-                                value={formData.country}
-                                onChange={handleChange}
-                                style={{
-                                    padding: "0.5rem",
-                                    borderRadius: "4px",
-                                    border: "1px solid #ccc",
-                                    fontSize: "1rem",
-                                }}
+            <form 
+                style={{ maxWidth: "500px", width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}
+                aria-label="Document generation form"
+            >
+                {Object.entries(formData).map(([key, value]) => {
+                    const fieldId = `field-${key}`;
+                    // 特殊处理 ID 和 USD
+                    const labelText = key
+                        .replace(/([A-Z])/g, ' $1')
+                        .replace(/^./, str => str.toUpperCase())
+                        .replace(/\bId\b/gi, 'ID')
+                        .replace(/\bUsd\b/gi, 'USD');
+                    
+                    return (
+                        <div key={key} style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                            <label 
+                                htmlFor={fieldId}
+                                style={{ fontWeight: "bold", color: "#555" }}
                             >
-                                {countries.map((country) => (
-                                    <option key={country} value={country}>
-                                        {country}
-                                    </option>
-                                ))}
-                            </select>
-                        ) : (
-                            <input
-                                type={key.includes("Date") ? "date" : "text"}
-                                name={key}
-                                value={(formData as unknown as Record<string, string>)[key]} // 使用类型断言替代 any
-                                onChange={handleChange}
-                                style={{
-                                    padding: "0.5rem",
-                                    borderRadius: "4px",
-                                    border: "1px solid #ccc",
-                                    fontSize: "1rem",
-                                    width: "100%",
-                                }}
-                            />
-                        )}
-                    </div>
-                ))}
+                                {labelText}
+                            </label>
+                            {key === "country" ? (
+                                <select
+                                    id={fieldId}
+                                    name={key}
+                                    value={value}
+                                    onChange={handleChange}
+                                    aria-label="Select country"
+                                    title="Select your country"
+                                    style={{
+                                        padding: "0.5rem",
+                                        borderRadius: "4px",
+                                        border: "1px solid #ccc",
+                                        fontSize: "1rem",
+                                    }}
+                                >
+                                    {countries.map((country) => (
+                                        <option key={country} value={country}>
+                                            {country}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    id={fieldId}
+                                    type={key.includes("Date") ? "date" : "text"}
+                                    name={key}
+                                    value={value}
+                                    onChange={handleChange}
+                                    placeholder={`Enter ${labelText.toLowerCase()}`}
+                                    title={`Enter ${labelText.toLowerCase()}`}
+                                    aria-label={labelText}
+                                    autoComplete={getAutoComplete(key)}
+                                    required
+                                    style={{
+                                        padding: "0.5rem",
+                                        borderRadius: "4px",
+                                        border: "1px solid #ccc",
+                                        fontSize: "1rem",
+                                        width: "100%",
+                                        textSizeAdjust: "100%",
+                                    }}
+                                />
+                            )}
+                        </div>
+                    );
+                })}
                 <button
                     type="button"
                     onClick={generateDocument}
+                    disabled={generating}
+                    aria-label={generating ? "Generating document..." : "Generate PDF document"}
                     style={{
                         padding: "0.75rem",
-                        backgroundColor: "#0070f3",
+                        backgroundColor: generating ? "#ccc" : "#0070f3",
                         color: "white",
                         fontSize: "1rem",
                         border: "none",
                         borderRadius: "4px",
-                        cursor: "pointer",
+                        cursor: generating ? "not-allowed" : "pointer",
                         marginTop: "1rem",
                     }}
                 >
-                    Generate Document
+                    {generating ? "Generating..." : "Generate PDF"}
                 </button>
             </form>
         </main>
