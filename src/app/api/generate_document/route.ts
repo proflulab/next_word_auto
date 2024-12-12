@@ -1,49 +1,77 @@
-import Docxtemplater from "docxtemplater";
-import PizZip from "pizzip";
-import { NextResponse } from "next/server";
-import path from "path";
-import fs from "fs";
+import { NextRequest, NextResponse } from 'next/server';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
+import * as fs from 'fs';
+import * as path from 'path';
+import convertapi from 'convertapi';
 
-export async function POST(request: Request): Promise<NextResponse> {
-    const data = await request.json(); // 从请求体中获取渲染数据
+const converter = new convertapi('secret_tZZbgUHdEMJy5b78');
 
-    // 使用 public 文件夹下的路径
-    const filePath = path.join(process.cwd(), "public", "word", "Lulab_invioce.docx");
-    const content = fs.readFileSync(filePath, "binary");
+export async function POST(request: NextRequest) {
+    try {
+        const data = await request.json();
+        const format = request.nextUrl.searchParams.get('format') || 'pdf';
 
-    const zip = new PizZip(content);
-    const doc = new Docxtemplater(zip, {
-        linebreaks: true,
-        paragraphLoop: true,
-    });
+        // Check if the data contains any unexpected or special characters
+        console.log('Received data:', data);
 
-    // 渲染模板的变量，使用请求传入的数据
-    doc.render({
-        发放时间_en: data.issuanceDate,        // 发放时间
-        详细地址_en: data.address,              // 详细地址
-        城市_en: data.city,                     // 城市
-        省份_en: data.state,                    // 省份
-        邮编: data.postalCode,                  // 邮编
-        国家_en: data.country,                  // 国家
-        姓名_en: data.name,                     // 姓名
-        学生学号: data.studentID,               // 学生学号
-        项目名称: data.programName,             // 项目名称
-        开始时间_en: data.startDate,            // 开始时间
-        结束时间_en: data.endDate,              // 结束时间
-        实际价格_美元: data.tuitionFeeUSD       // 实际价格（美元）
-    });
+        // Read template file
+        const templatePath = path.join(process.cwd(), 'public', 'word', 'Lulab_invioce.docx');
+        if (!fs.existsSync(templatePath)) {
+            return NextResponse.json({ error: 'Template file not found' }, { status: 404 });
+        }
 
-    // 生成文档为 buffer
-    const docBuffer = doc.getZip().generate({
-        type: "nodebuffer",
-        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
+        const template = fs.readFileSync(templatePath);
+        const zip = new PizZip(template);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
-    // 设置响应头并返回文档
-    return new NextResponse(docBuffer, {
-        headers: {
-            "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "Content-Disposition": 'attachment; filename="offer_letter.docx"',
-        },
-    });
+        // Fill template data
+        try {
+            doc.render(data);
+        } catch (error) {
+            console.error("Error during template rendering:", error);
+            return NextResponse.json({ error: 'Template rendering failed' }, { status: 500 });
+        }
+
+        const wordContent = doc.getZip().generate({
+            type: 'nodebuffer',
+            mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
+
+        if (format === 'word') {
+            return new NextResponse(wordContent, {
+                headers: {
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'Content-Disposition': 'attachment; filename="Generated_Document.docx"',
+                },
+            });
+        }
+
+        // Convert to PDF
+        const tempDocxPath = path.join(process.cwd(), 'temp', `temp_${Date.now()}.docx`);
+        fs.writeFileSync(tempDocxPath, wordContent);
+
+        try {
+            const result = await converter.convert('pdf', { File: tempDocxPath }, 'docx');
+            const pdfResponse = await fetch(result.file.url);
+            const pdfBuffer = await pdfResponse.arrayBuffer();
+
+            // Clean up temp file
+            fs.unlinkSync(tempDocxPath);
+
+            return new NextResponse(pdfBuffer, {
+                headers: {
+                    'Content-Type': 'application/pdf',
+                    'Content-Disposition': 'attachment; filename="Generated_Document.pdf"',
+                },
+            });
+        } catch (err) {
+            fs.unlinkSync(tempDocxPath);
+            console.error("Error during PDF conversion:", err);
+            return NextResponse.json({ error: 'PDF conversion failed' }, { status: 500 });
+        }
+    } catch (error) {
+        console.error("General error:", error);
+        return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    }
 }
