@@ -72,30 +72,30 @@ export default function HomeContent() {
         if (generating) return; // Prevent further clicks while generating
         setGenerating(true);
         setCurrentFormat(format);
-
+    
         try {
             const response = await fetch(`/api/generate_document?format=${format}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData),
             });
-
+    
             if (!response.ok) throw new Error(await response.text());
-
+    
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
+            const fileExtension = format === "pdf" ? "pdf" : "docx"; // Set extension based on selected format
             const a = document.createElement("a");
             a.href = url;
-            a.download = `Generated_Document.${format}`;
+            a.download = `Generated_Document.${fileExtension}`; // Dynamic file extension
             a.click();
         } catch (err) {
             alert((err as Error).message);
         } finally {
             setGenerating(false);
-            setCurrentFormat(null);
         }
     };
-
+    
     return (
         <main style={{ padding: "2rem", maxWidth: "700px", margin: "auto" }}>
             <h1 style={{ textAlign: "center", fontSize: "2rem", marginBottom: "1.5rem" }}>Generate Offer Letter</h1>
@@ -246,7 +246,7 @@ export default function HomeContent() {
                         <button
                             type="button"
                             onClick={() => generateDocument("pdf")}
-                            disabled={generating || currentFormat === "word"}
+                            disabled={generating}
                             style={{ ...styles.button, backgroundColor: currentFormat === "pdf" ? "#0056b3" : "#007bff" }}
                         >
                             {generating && currentFormat === "pdf" ? "Generating PDF..." : "Generate PDF"}
@@ -254,7 +254,7 @@ export default function HomeContent() {
                         <button
                             type="button"
                             onClick={() => generateDocument("word")}
-                            disabled={generating || currentFormat === "pdf"}
+                            disabled={generating}
                             style={{ ...styles.button, backgroundColor: currentFormat === "word" ? "#0056b3" : "#007bff" }}
                         >
                             {generating && currentFormat === "word" ? "Generating Word..." : "Generate Word"}
