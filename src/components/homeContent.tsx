@@ -61,6 +61,7 @@ export default function HomeContent() {
         tuitionFeeUSD: "",
     });
     const [generating, setGenerating] = useState(false);
+    const [currentFormat, setCurrentFormat] = useState<"pdf" | "word" | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -68,8 +69,11 @@ export default function HomeContent() {
     };
 
     const generateDocument = async (format: "pdf" | "word") => {
+        if (generating) return; // Prevent further clicks while generating
+        setGenerating(true);
+        setCurrentFormat(format);
+
         try {
-            setGenerating(true);
             const response = await fetch(`/api/generate_document?format=${format}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -88,6 +92,7 @@ export default function HomeContent() {
             alert((err as Error).message);
         } finally {
             setGenerating(false);
+            setCurrentFormat(null);
         }
     };
 
@@ -228,7 +233,7 @@ export default function HomeContent() {
                     <div>
                         <label style={styles.label}>Tuition Fee (USD)</label>
                         <input
-                            type="text"
+                            type="number"
                             name="tuitionFeeUSD"
                             value={formData.tuitionFeeUSD}
                             onChange={handleChange}
@@ -236,22 +241,23 @@ export default function HomeContent() {
                             style={styles.input}
                         />
                     </div>
+
                     <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem" }}>
                         <button
                             type="button"
                             onClick={() => generateDocument("pdf")}
-                            disabled={generating}
-                            style={styles.button}
+                            disabled={generating || currentFormat === "word"}
+                            style={{ ...styles.button, backgroundColor: currentFormat === "pdf" ? "#0056b3" : "#007bff" }}
                         >
-                            {generating ? "Generating PDF..." : "Generate PDF"}
+                            {generating && currentFormat === "pdf" ? "Generating PDF..." : "Generate PDF"}
                         </button>
                         <button
                             type="button"
                             onClick={() => generateDocument("word")}
-                            disabled={generating}
-                            style={styles.button}
+                            disabled={generating || currentFormat === "pdf"}
+                            style={{ ...styles.button, backgroundColor: currentFormat === "word" ? "#0056b3" : "#007bff" }}
                         >
-                            {generating ? "Generating Word..." : "Generate Word"}
+                            {generating && currentFormat === "word" ? "Generating Word..." : "Generate Word"}
                         </button>
                     </div>
                 </div>
