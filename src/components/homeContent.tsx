@@ -108,6 +108,7 @@ export default function HomeContent() {
         };
     
         try {
+            console.log("Sending request to /api/pdf_document with data:", formattedData);
             const response = await fetch("/api/pdf_document", {
                 method: "POST",
                 headers: {
@@ -116,14 +117,19 @@ export default function HomeContent() {
                 body: JSON.stringify(formattedData),
             });
     
+            console.log("Response status:", response.status);
+    
             if (!response.ok) {
-                throw new Error("Failed to generate PDF");
+                throw new Error(`Failed to generate PDF: ${response.statusText}`);
             }
     
             const blob = await response.blob();
             saveAs(blob, "Lulab_invioce_" + formattedData.name + ".pdf");
         } catch (error) {
             console.error("Error generating PDF:", error);
+            if (error instanceof Error) {
+                console.error("Error details:", error.message, error.stack);
+            }
             alert("Failed to generate PDF. Please try again.");
         } finally {
             setIsGeneratingPdf(false); // 重新启用按钮
