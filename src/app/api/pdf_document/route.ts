@@ -52,7 +52,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         // 发送请求到 stirlingpdf.io
         const response = await axios.post(
-            "https://stirlingpdf.io/api/v1/convert/file/pdf",
+            "https://s-pdf-ymdzlook.sealoshzh.site/api/v1/convert/file/pdf",
             form,
             {
                 headers: {
