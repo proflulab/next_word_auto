@@ -1,18 +1,7 @@
-/*
- * @Author: 杨仕明 shiming.y@qq.com
- * @Date: 2024-11-06 18:28:01
- * @LastEditors: 杨仕明 shiming.y@qq.com
- * @LastEditTime: 2024-11-06 18:53:34
- * @FilePath: /next_word_auto/src/components/HomeContent.tsx
- * @Description: 
- * 
- * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
- */
 'use client';
 
-import { useState } from "react";
 import { saveAs } from "file-saver";
-
+import React, { useState } from "react";
 // 定义 formData 的类型
 interface FormDataType {
     issuanceDate: string;
@@ -53,11 +42,12 @@ const countries = [
     "Zambia", "Zimbabwe"
 ];
 
-// 同样使用之前的代码，不再重复代码示例
 export default function HomeContent() {
-    const [formData, setFormData] = useState<FormDataType>({
+    const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [formData, setFormData] = useState<FormDataType>(() => ({
         name: "",                     // 姓名
-        country: "China",     // 国家，默认值
+        country: "China",             // 国家，默认值
         state: "",                    // 省份
         city: "",                     // 城市
         postalCode: "",               // 邮编
@@ -68,8 +58,7 @@ export default function HomeContent() {
         startDate: "",                // 开始时间
         endDate: "",                  // 结束时间
         tuitionFeeUSD: "",            // 实际价格（美元）
-    });
-
+    }));
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -80,11 +69,16 @@ export default function HomeContent() {
     };
 
     const formatDate = (dateString: string) => {
-        const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: '2-digit' };
-        return new Date(dateString).toLocaleDateString('en-US', options);
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const year = date.getFullYear();
+        const month = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${month} ${day}, ${year}`;
     };
 
     const generateDocument = async () => {
+        setIsGeneratingDocx(true); // 禁用按钮
         const formattedData = {
             ...formData,
             issuanceDate: formatDate(formData.issuanceDate),
@@ -93,7 +87,7 @@ export default function HomeContent() {
         };
 
         try {
-            const response = await fetch("/api/generate_document", {  // 更新为新的API路径
+            const response = await fetch("/api/generate_document", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -104,9 +98,47 @@ export default function HomeContent() {
             saveAs(blob, "Lulab_invioce_" + formattedData.name + ".docx");
         } catch (error) {
             console.error("Error generating document:", error);
+        } finally {
+            setIsGeneratingDocx(false); // 重新启用按钮
         }
     };
+    const generatePdf = async () => {
+        setIsGeneratingPdf(true); // 禁用按钮
+        const formattedData = {
+            ...formData,
+            issuanceDate: formatDate(formData.issuanceDate),
+            startDate: formatDate(formData.startDate),
+            endDate: formatDate(formData.endDate),
+        };
 
+        try {
+            console.log("Sending request to /api/pdf_document with data:", formattedData);
+            const response = await fetch("/api/pdf_document", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(formattedData),
+            });
+
+            console.log("Response status:", response.status);
+
+            if (!response.ok) {
+                throw new Error(`Failed to generate PDF: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+            saveAs(blob, "Lulab_invioce_" + formattedData.name + ".pdf");
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+            if (error instanceof Error) {
+                console.error("Error details:", error.message, error.stack);
+            }
+            alert("Failed to generate PDF. Please try again.");
+        } finally {
+            setIsGeneratingPdf(false); // 重新启用按钮
+        }
+    };
     return (
         <main style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Arial, sans-serif", marginTop: "2rem" }}>
             <h1 style={{ fontSize: "2rem", color: "#333", marginBottom: "1rem" }}>Generate Admission Offer Letter</h1>
@@ -152,18 +184,36 @@ export default function HomeContent() {
                 <button
                     type="button"
                     onClick={generateDocument}
+                    disabled={isGeneratingDocx} // 禁用按钮
                     style={{
                         padding: "0.75rem",
-                        backgroundColor: "#0070f3",
+                        backgroundColor: isGeneratingDocx ? "#ccc" : "#0070f3", // 加载时改变颜色
                         color: "white",
                         fontSize: "1rem",
                         border: "none",
                         borderRadius: "4px",
-                        cursor: "pointer",
+                        cursor: isGeneratingDocx ? "not-allowed" : "pointer", // 加载时改变光标
                         marginTop: "1rem",
                     }}
                 >
-                    Generate Document
+                    {isGeneratingDocx ? "Generating..." : "Generate Document"}
+                </button>
+                <button
+                    type="button"
+                    onClick={generatePdf}
+                    disabled={isGeneratingPdf} // 禁用按钮
+                    style={{
+                        padding: "0.75rem",
+                        backgroundColor: isGeneratingPdf ? "#ccc" : "#0070f3", // 加载时改变颜色
+                        color: "white",
+                        fontSize: "1rem",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: isGeneratingPdf ? "not-allowed" : "pointer", // 加载时改变光标
+                        marginTop: "1rem",
+                    }}
+                >
+                    {isGeneratingPdf ? "Generating..." : "PDF Document"}
                 </button>
             </form>
         </main>
