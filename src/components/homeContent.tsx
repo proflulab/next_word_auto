@@ -46,18 +46,18 @@ export default function HomeContent() {
     const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [formData, setFormData] = useState<FormDataType>(() => ({
-        name: "",
-        country: "China",
-        state: "",
-        city: "",
-        postalCode: "",
-        address: "",
-        studentID: "",
-        programName: "Practical Training Club",
-        issuanceDate: "",
-        startDate: "",
-        endDate: "",
-        tuitionFeeUSD: "",
+        name: "",                     // 姓名
+        country: "China",             // 国家，默认值
+        state: "",                    // 省份
+        city: "",                     // 城市
+        postalCode: "",               // 邮编
+        address: "",                  // 详细地址
+        studentID: "",                // 学生学号
+        programName: "Practical Training Club",  // 项目名称
+        issuanceDate: "",             // 发放时间
+        startDate: "",                // 开始时间
+        endDate: "",                  // 结束时间
+        tuitionFeeUSD: "",            // 实际价格（美元）
     }));
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -85,7 +85,7 @@ export default function HomeContent() {
             startDate: formatDate(formData.startDate),
             endDate: formatDate(formData.endDate),
         };
-    
+
         try {
             const response = await fetch("/api/generate_document", {
                 method: "POST",
@@ -110,7 +110,7 @@ export default function HomeContent() {
             startDate: formatDate(formData.startDate),
             endDate: formatDate(formData.endDate),
         };
-    
+
         try {
             console.log("Sending request to /api/pdf_document with data:", formattedData);
             const response = await fetch("/api/pdf_document", {
@@ -120,13 +120,13 @@ export default function HomeContent() {
                 },
                 body: JSON.stringify(formattedData),
             });
-    
+
             console.log("Response status:", response.status);
-    
+
             if (!response.ok) {
                 throw new Error(`Failed to generate PDF: ${response.statusText}`);
             }
-    
+
             const blob = await response.blob();
             saveAs(blob, "Lulab_invioce_" + formattedData.name + ".pdf");
         } catch (error) {
@@ -181,7 +181,7 @@ export default function HomeContent() {
                         )}
                     </div>
                 ))}
-            <button
+                <button
                     type="button"
                     onClick={generateDocument}
                     disabled={isGeneratingDocx} // 禁用按钮
@@ -196,7 +196,7 @@ export default function HomeContent() {
                         marginTop: "1rem",
                     }}
                 >
-                    {isGeneratingDocx ? "Generating..." : "Generate Document"} 
+                    {isGeneratingDocx ? "Generating..." : "Generate Document"}
                 </button>
                 <button
                     type="button"
@@ -213,7 +213,7 @@ export default function HomeContent() {
                         marginTop: "1rem",
                     }}
                 >
-                    {isGeneratingPdf ? "Generating..." : "PDF Document"} 
+                    {isGeneratingPdf ? "Generating..." : "PDF Document"}
                 </button>
             </form>
         </main>
