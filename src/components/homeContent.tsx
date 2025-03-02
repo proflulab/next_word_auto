@@ -43,22 +43,22 @@ const countries = [
 ];
 
 export default function HomeContent() {
-    const [isGeneratingDocx, setIsGeneratingDocx] = useState(false); // 控制 .docx 按钮
-    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);   // 控制 PDF 按钮
-    const [formData, setFormData] = useState<FormDataType>({
-        name: "",                     // 姓名
-        country: "China",             // 国家，默认值
-        state: "",                    // 省份
-        city: "",                     // 城市
-        postalCode: "",               // 邮编
-        address: "",                  // 详细地址
-        studentID: "",                // 学生学号
-        programName: "Practical Training Club",  // 项目名称
-        issuanceDate: "",             // 发放时间
-        startDate: "",                // 开始时间
-        endDate: "",                  // 结束时间
-        tuitionFeeUSD: "",            // 实际价格（美元）
-    });
+    const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [formData, setFormData] = useState<FormDataType>(() => ({
+        name: "",
+        country: "China",
+        state: "",
+        city: "",
+        postalCode: "",
+        address: "",
+        studentID: "",
+        programName: "Practical Training Club",
+        issuanceDate: "",
+        startDate: "",
+        endDate: "",
+        tuitionFeeUSD: "",
+    }));
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -69,8 +69,12 @@ export default function HomeContent() {
     };
 
     const formatDate = (dateString: string) => {
-        const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: '2-digit' };
-        return new Date(dateString).toLocaleDateString('en-US', options);
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const year = date.getFullYear();
+        const month = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${month} ${day}, ${year}`;
     };
 
     const generateDocument = async () => {
