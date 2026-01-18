@@ -13,17 +13,18 @@ const navLinks = [
 interface SidebarProps {
   isCollapsed: boolean;
   toggleSidebar: () => void;
+  isMounted: boolean;
 }
 
-const Sidebar = ({ isCollapsed, toggleSidebar }: SidebarProps) => {
+const Sidebar = ({ isCollapsed, toggleSidebar, isMounted }: SidebarProps) => {
   const pathname = usePathname();
 
   return (
-    <aside className={`bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-800 dark:text-gray-300 flex flex-col shadow-lg transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+    <aside className={`bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-800 dark:text-gray-300 flex flex-col shadow-lg ${isMounted && 'transition-all duration-300'} ${isCollapsed ? 'w-20' : 'w-64'}`}>
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <Link href="/" className={`text-transparent bg-gradient-to-r from-slate-700 via-blue-600 to-indigo-500 bg-clip-text font-bold text-xl hover:opacity-80 transition-opacity ${isCollapsed ? 'hidden' : 'block'}`}>DocuFlow</Link>
+            <Link href="/" className={`whitespace-nowrap text-transparent bg-gradient-to-r from-slate-700 via-blue-600 to-indigo-500 bg-clip-text font-bold text-xl hover:opacity-80 ${isCollapsed ? 'hidden' : 'block'}`}>DocuFlow</Link>
             <button onClick={toggleSidebar} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-                <ChevronLeft className={`transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
+                <ChevronLeft className={`${isMounted && 'transition-transform duration-300'} ${isCollapsed ? 'rotate-180' : ''}`} />
             </button>
         </div>
       <nav className="flex-grow p-4">
@@ -42,7 +43,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }: SidebarProps) => {
                   } ${isCollapsed ? 'justify-center' : ''}`}
                 >
                   <Icon className={`h-6 w-6 ${isCollapsed ? '' : 'mr-4'} ${link.color}`} />
-                  <span className={`${isCollapsed ? 'hidden' : 'block'}`}>{link.label}</span>
+                  <span className={`${isCollapsed ? 'hidden' : 'block whitespace-nowrap'}`}>{link.label}</span>
                 </Link>
                 {isCollapsed && (
                   <Link href={link.href} className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-4 py-2 bg-gray-800 text-white text-base rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
