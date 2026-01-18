@@ -20,12 +20,9 @@ const Sidebar = ({ isCollapsed, toggleSidebar, isMounted }: SidebarProps) => {
   const pathname = usePathname();
 
   return (
-    <aside className={`bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-800 dark:text-gray-300 flex flex-col shadow-lg ${isMounted && 'transition-all duration-300'} ${isCollapsed ? 'w-20' : 'w-64'}`}>
+    <aside className={`bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-800 dark:text-gray-300 flex flex-col shadow-lg ${isMounted && 'transition-all duration-300'} ${isCollapsed ? 'w-20' : 'w-56'}`}>
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <Link href="/" className={`whitespace-nowrap text-transparent bg-gradient-to-r from-slate-700 via-blue-600 to-indigo-500 bg-clip-text font-bold text-xl hover:opacity-80 ${isCollapsed ? 'hidden' : 'block'}`}>DocuFlow</Link>
-            <button onClick={toggleSidebar} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-                <ChevronLeft className={`${isMounted && 'transition-transform duration-300'} ${isCollapsed ? 'rotate-180' : ''}`} />
-            </button>
+            
         </div>
       <nav className="flex-grow p-4">
         <ul>
@@ -55,6 +52,11 @@ const Sidebar = ({ isCollapsed, toggleSidebar, isMounted }: SidebarProps) => {
           })}
         </ul>
       </nav>
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <button onClick={toggleSidebar} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 w-full flex justify-center">
+            <ChevronLeft className={`${isMounted && 'transition-transform duration-300'} ${isCollapsed ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
     </aside>
   );
 };
