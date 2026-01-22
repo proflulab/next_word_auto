@@ -23,6 +23,8 @@ export interface FieldConfig {
         dateFormat?: string;
         numberFormat?: string;
     };
+    countryLang?: import('@/constants/countries').CountryLang; // 国家字段：语言格式
+    countryValue?: string; // 国家字段：选中的国家 code
 }
 
 // 云端模板接口

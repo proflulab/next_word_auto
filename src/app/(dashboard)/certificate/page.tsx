@@ -14,14 +14,14 @@
 import React, { useState, useCallback } from 'react';
 import { Button, Card, Space, Typography, message, Popconfirm, DatePicker, Select, Input, InputNumber, Checkbox } from 'antd';
 import { PlusOutlined, DeleteOutlined, CloudOutlined, SettingOutlined, EyeOutlined } from '@ant-design/icons';
-import TemplatePreview from '../../components/preview/TemplatePreview';
-import DocumentGenerator from '../../components/generators/DocumentGenerator';
+import TemplatePreview from '@/components/preview/TemplatePreview';
+import DocumentGenerator from '@/components/generators/DocumentGenerator';
 import dayjs from 'dayjs';
-import { COUNTRIES } from '../../constants/countries';
-import { FIELD_TYPES, DEFAULT_FIELDS } from '../../constants/fields';
-import { CURRENCY_OPTIONS } from '../../constants/currencies';
-import { FieldConfig, CloudTemplate } from '../../types';
-import { inferFieldType } from '../../utils/fieldTypeInference';
+import { COUNTRY_LANG_OPTIONS, HOT_COUNTRIES, CountryLang } from '@/constants/countries';
+import { FIELD_TYPES, DEFAULT_FIELDS } from '@/constants/fields';
+import { CURRENCY_OPTIONS } from '@/constants/currencies';
+import { FieldConfig, CloudTemplate } from '@/types';
+import { inferFieldType } from '@/utils/fieldTypeInference';
 
 
 const { Title } = Typography;
@@ -178,12 +178,12 @@ export default function CertificatePage() {
                 return (
                     <div className="flex gap-2">
                         <Select
-                            value={field.format?.currencySymbol || '¥'}
+                            value={field.format?.currencySymbol || 'CNY'}
                             onChange={(value) => updateField(field.id, {
                                 format: { ...field.format, currencySymbol: value }
                             })}
                             size="small"
-                            className="w-16"
+                            className="w-20"
                             options={CURRENCY_OPTIONS}
                         />
                         <Select
@@ -240,6 +240,25 @@ export default function CertificatePage() {
                             { label: '千分位', value: 'thousand' },
                             { label: '百分比', value: 'percent' },
                         ]}
+                    />
+                );
+            case 'country':
+                // 格式：语言选择（10种常用语言）
+                return (
+                    <Select
+                        value={field.countryLang || 'zh'}
+                        onChange={(lang) => {
+                                // 更新字段的 countryLang，同时把 countryValue 清空
+                                const newFields = fields.map(f =>
+                                    f.id === field.id ? { ...f, countryLang: lang as CountryLang, countryValue: '' } : f
+                                );
+                                setFields(newFields);
+                                // 表单值也清空
+                                setFormData(prev => ({ ...prev, [field.name]: '' }));
+                            }}
+                        size="small"
+                        className="w-full"
+                        options={COUNTRY_LANG_OPTIONS}
                     />
                 );
             default:
@@ -316,17 +335,32 @@ export default function CertificatePage() {
                     />
                 );
             case 'country':
+                // 国家字段：仅保留「值」下拉（国家），语言选择已移到「格式」列
+                const currentLang = field.countryLang || 'zh';
+                const countryOpts = HOT_COUNTRIES[currentLang] || HOT_COUNTRIES.zh;
                 return (
                     <Select
-                        value={(formData[field.name] as string) || undefined}
-                        onChange={(value) => setFormData(prev => ({ ...prev, [field.name]: value }))}
-                        placeholder={`请选择${field.name}`}
+                        key={currentLang}                       // 关键：语言切换后重新挂载，避免旧值残留
+                        value={field.countryValue || undefined}
+                        onChange={(code) => {
+                            // 找到当前语言下对应国家的完整名称
+                            const selected = countryOpts.find(opt => opt.value === code);
+                            const fullName = selected?.label || code;
+                            // 更新字段的 countryValue（仍存 code，用于回显 key）
+                            const newFields = fields.map(f =>
+                                f.id === field.id ? { ...f, countryValue: code } : f
+                            );
+                            setFields(newFields);
+                            // 真正写到表单的值是该国当地语言全拼
+                            setFormData(prev => ({ ...prev, [field.name]: fullName }));
+                        }}
+                        placeholder="请选择国家"
                         className="w-full"
                         size="small"
-                        options={COUNTRIES}
+                        options={countryOpts}
                         showSearch
                         allowClear
-                        status={isRequired && !hasValue ? 'error' : undefined}
+                        status={isRequired && !field.countryValue ? 'error' : undefined}
                         filterOption={(input, option) =>
                             (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                         }

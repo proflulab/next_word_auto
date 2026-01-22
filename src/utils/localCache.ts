@@ -11,6 +11,7 @@ export interface CachedFile {
     type: string;
     lastModified: number;
     createdAt: number;
+    publicName?: string; // 云端公网文件名（Blob 路径）
 }
 
 // IndexedDB 数据库配置

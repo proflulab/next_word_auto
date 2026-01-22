@@ -21,17 +21,28 @@ export default function PasswordPage() {
     const [error, setError] = useState("");
     const router = useRouter();
 
-    const correctPassword = process.env.NEXT_PUBLIC_PASSWORD; // 从环境变量获取密码
-
-    const handlePasswordSubmit = (e: React.FormEvent) => {
+    const handlePasswordSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (password === correctPassword) {
-            // 设置cookie，这样中间件可以读取
-            document.cookie = "isAuthenticated=true; path=/; max-age=86400"; // 24小时有效
-            localStorage.setItem("isAuthenticated", "true"); // 保持localStorage以兼容其他可能的客户端检查
-            router.push("/"); // 跳转到主页
-        } else {
-            setError("Incorrect password. Please try again.");
+        setError(""); // Clear previous errors
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ password }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                router.push("/"); // Redirect to home on successful login
+            } else {
+                setError(data.message || "Incorrect password. Please try again.");
+            }
+        } catch (err) {
+            setError("An error occurred while trying to log in. Please try again.");
         }
     };
 
