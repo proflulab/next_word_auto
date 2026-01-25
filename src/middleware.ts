@@ -9,51 +9,57 @@
  * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
  */
 
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
-export function middleware(request: NextRequest) {
-  // 获取当前路径
-  const { pathname } = request.nextUrl
-
-  // 检查是否配置了密码环境变量
-  const password = process.env.NEXT_PUBLIC_PASSWORD
-
-  // 如果没有配置密码环境变量，直接通过所有请求
-  if (!password) {
-    return NextResponse.next()
+async function verifyJWT(token: string, secret: Uint8Array) {
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    return payload;
+  } catch (error) {
+    return null;
   }
-
-  // 不需要验证的路径
-  const publicPaths = ['/', '/password']
-
-  // 如果是公开路径，直接通过
-  if (publicPaths.includes(pathname)) {
-    return NextResponse.next()
-  }
-
-  // 检查是否已经验证
-  const isAuthenticated = request.cookies.get('isAuthenticated')?.value
-
-  // 如果没有验证，重定向到密码页面
-  if (isAuthenticated !== 'true') {
-    return NextResponse.redirect(new URL('/password', request.url))
-  }
-
-  // 验证通过，继续访问
-  return NextResponse.next()
 }
 
-// 配置中间件匹配的路径
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const password = process.env.PASSWORD;
+
+  if (!password) {
+    return NextResponse.next();
+  }
+
+  const publicPaths = ['/', '/password'];
+  if (publicPaths.includes(pathname)) {
+    return NextResponse.next();
+  }
+
+  const token = request.cookies.get('token')?.value;
+  const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+
+  if (!token) {
+    const url = new URL('/password', request.url);
+    url.searchParams.set('redirect_uri', pathname);
+    return NextResponse.redirect(url);
+  }
+
+  const payload = await verifyJWT(token, secret);
+
+  if (!payload) {
+    // If token is invalid, delete the cookie and redirect
+    const url = new URL('/password', request.url);
+    url.searchParams.set('redirect_uri', pathname);
+    const response = NextResponse.redirect(url);
+    response.cookies.delete('token');
+    return response;
+  }
+
+  return NextResponse.next();
+}
+
 export const config = {
   matcher: [
-    /*
-     * 匹配所有路径除了:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
-}
+};

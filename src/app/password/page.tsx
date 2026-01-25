@@ -13,13 +13,15 @@
 'use client';
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 
 export default function PasswordPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const redirect_uri = searchParams.get('redirect_uri');
 
     const handlePasswordSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -31,13 +33,13 @@ export default function PasswordPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ password }),
+                body: JSON.stringify({ password, redirect_uri }),
             });
 
             const data = await response.json();
 
             if (data.success) {
-                router.push("/"); // Redirect to home on successful login
+                router.push(data.redirect_uri || "/"); // Redirect to home on successful login
             } else {
                 setError(data.message || "Incorrect password. Please try again.");
             }

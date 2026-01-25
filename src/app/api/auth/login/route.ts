@@ -1,22 +1,35 @@
+import { SignJWT } from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { password } = await req.json();
+    const { password, redirect_uri } = await req.json();
 
     if (password === process.env.PASSWORD) {
-      const response = NextResponse.json({ success: true });
-      response.cookies.set('isAuthenticated', 'true', {
+      // Create the JWT
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+      const alg = 'HS256';
+      const token = await new SignJWT({ 'urn:example:claim': true })
+        .setProtectedHeader({ alg })
+        .setIssuedAt()
+        .sign(secret);
+
+      const response = NextResponse.json({ success: true, redirect_uri: redirect_uri || '/' });
+      response.cookies.set('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24, // 24 hours
         path: '/',
       });
       return response;
     } else {
-      return NextResponse.json({ success: false, message: 'Incorrect password' }, { status: 401 });
+      const response = NextResponse.json({ success: false, message: 'Incorrect password' }, { status: 401 });
+      response.cookies.delete('token');
+      return response;
     }
   } catch (error) {
-    return NextResponse.json({ success: false, message: 'An error occurred' }, { status: 500 });
+    console.error('Login API error:', error);
+    const response = NextResponse.json({ success: false, message: 'An error occurred' }, { status: 500 });
+    response.cookies.delete('token');
+    return response;
   }
 }
