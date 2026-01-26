@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
       const token = await new SignJWT({ 'urn:example:claim': true })
         .setProtectedHeader({ alg })
         .setIssuedAt()
+        .setExpirationTime('24h')
         .sign(secret);
 
       const response = NextResponse.json({ success: true, redirect_uri: redirect_uri || '/' });
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         path: '/',
+        maxAge: 86400, // 24 hours in seconds
       });
       return response;
     } else {
