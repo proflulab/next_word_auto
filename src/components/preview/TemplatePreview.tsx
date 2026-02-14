@@ -7,8 +7,9 @@
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 
-import React, { useState } from 'react'
-import { Modal, Spin } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Modal, Spin, Alert, Button, Space } from 'antd'
+import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons'
 
 // OfficeWebViewer 组件使用微软 Office Web Viewer 来预览文档
 interface OfficeWebViewerProps {
@@ -18,6 +19,8 @@ interface OfficeWebViewerProps {
 const OfficeWebViewer = (props: OfficeWebViewerProps) => {
     const { fileUrl } = props
     const [isLoading, setIsLoading] = useState<boolean>(true)
+    const [error, setError] = useState<string | null>(null)
+    const [loadTimeout, setLoadTimeout] = useState<boolean>(false)
     
     // 构建 Office Web Viewer 的嵌入 URL
     const getOfficeWebViewerUrl = (url: string) => {
@@ -26,15 +29,74 @@ const OfficeWebViewer = (props: OfficeWebViewerProps) => {
         return `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`
     }
 
+    // 设置加载超时
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (isLoading) {
+                setLoadTimeout(true)
+                setError('预览加载超时，请检查网络连接或稍后重试')
+            }
+        }, 15000) // 15秒超时
+
+        return () => clearTimeout(timer)
+    }, [isLoading])
+
     const handleIframeLoad = () => {
         setIsLoading(false)
+        setError(null)
+        setLoadTimeout(false)
+    }
+
+    const handleIframeError = () => {
+        setIsLoading(false)
+        setError('预览加载失败，请确保文档 URL 可公开访问')
+    }
+
+    const handleRetry = () => {
+        setIsLoading(true)
+        setError(null)
+        setLoadTimeout(false)
+    }
+
+    const handleDownload = () => {
+        const link = document.createElement('a')
+        link.href = fileUrl
+        link.download = fileUrl.split('/').pop() || 'document'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        document.body.removeChild(link)
     }
 
     return (
         <div className="relative h-full">
-            {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+            {error && (
+                <Alert
+                    message="预览出错"
+                    description={error}
+                    type="error"
+                    showIcon
+                    closable
+                    action={
+                        <Space>
+                            <Button size="small" onClick={handleRetry} icon={<ReloadOutlined />}>
+                                重试
+                            </Button>
+                            <Button size="small" onClick={handleDownload} icon={<DownloadOutlined />}>
+                                下载
+                            </Button>
+                        </Space>
+                    }
+                    className="mb-4"
+                />
+            )}
+            {isLoading && !error && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-75 z-10">
                     <Spin size="large" />
+                    <p className="mt-4 text-gray-600">正在加载预览...</p>
+                    {loadTimeout && (
+                        <p className="mt-2 text-sm text-orange-600">加载时间较长，请耐心等待</p>
+                    )}
                 </div>
             )}
             <iframe
@@ -42,8 +104,10 @@ const OfficeWebViewer = (props: OfficeWebViewerProps) => {
                 width="100%"
                 height="100%"
                 onLoad={handleIframeLoad}
+                onError={handleIframeError}
                 title="Office Document Preview"
                 style={{ minHeight: '750px', border: 'none' }}
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
             />
         </div>
     )
@@ -65,14 +129,17 @@ const TemplatePreview = (props: TemplatePreviewProps) => {
             title={`模板预览 - ${templateName}`}
             open={visible}
             onCancel={onClose}
-            footer={null}
+            footer={[
+                <Button key="close" onClick={onClose}>
+                    关闭
+                </Button>
+            ]}
             width={900}
-            style={{ top: 65 }}
+            centered
+            styles={{ body: { height: '50vh', overflow: 'hidden', padding: '0' } }}
         >
             {templateUrl && (
-                <div style={{ height: '800px', overflow: 'auto' }}>
-                    <OfficeWebViewer fileUrl={templateUrl} />
-                </div>
+                <OfficeWebViewer fileUrl={templateUrl} />
             )}
         </Modal>
     )
