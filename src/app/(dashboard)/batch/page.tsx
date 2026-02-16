@@ -156,7 +156,7 @@ export default function BatchPage() {
       return;
     }
     try {
-      let data: any;
+      let data: Record<string, unknown>[] | Record<string, unknown>;
       let trimmedText = batchInputText.trim();
       trimmedText = trimmedText.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
       try {
@@ -175,7 +175,7 @@ export default function BatchPage() {
       }
       if (!Array.isArray(data)) data = [data];
       const newBatchData: Array<Record<string, string | number | boolean | null | undefined>> = [];
-      data.forEach((item: any, index: number) => {
+      data.forEach((item: Record<string, unknown>, index: number) => {
         if (typeof item !== 'object' || item === null) throw new Error(`第 ${index + 1} 项不是有效的对象`);
         const record: Record<string, string | number | boolean | null | undefined> = {};
         Object.entries(item).forEach(([key, value]) => {
@@ -325,9 +325,9 @@ export default function BatchPage() {
                   <div className="text-sm text-gray-700">
                     <div className="font-medium mb-2">导入格式说明：</div>
                     <div className="text-xs text-gray-600 space-y-1">
-                      <div>💡 每个 {} 中间为一条数据记录</div>
-                      <div>💡 每个字段用 "字段名": "值" 的格式表示</div>
-                      <div>💡 多条数据用逗号分隔或用 [] 包装</div>
+                      <div>💡 每个 {'{}'} 中间为一条数据记录</div>
+                      <div>💡 每个字段用 &quot;字段名&quot;: &quot;值&quot; 的格式表示</div>
+                      <div>💡 多条数据用逗号分隔或用 {'[]'} 包装</div>
                     </div>
                   </div>
                 </div>
