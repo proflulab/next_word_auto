@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Modal, Spin, Alert, Button, Space } from 'antd'
-import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons'
+import { ReloadOutlined, DownloadOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons'
 
 // OfficeWebViewer 组件使用微软 Office Web Viewer 来预览文档
 interface OfficeWebViewerProps {
@@ -21,6 +21,7 @@ const OfficeWebViewer = (props: OfficeWebViewerProps) => {
     const [isLoading, setIsLoading] = useState<boolean>(true)
     const [error, setError] = useState<string | null>(null)
     const [loadTimeout, setLoadTimeout] = useState<boolean>(false)
+    const [scale, setScale] = useState<number>(0.8)
     
     // 构建 Office Web Viewer 的嵌入 URL
     const getOfficeWebViewerUrl = (url: string) => {
@@ -68,6 +69,18 @@ const OfficeWebViewer = (props: OfficeWebViewerProps) => {
         document.body.removeChild(link)
     }
 
+    const handleZoomIn = () => {
+        setScale(prev => Math.min(prev + 0.1, 2))
+    }
+
+    const handleZoomOut = () => {
+        setScale(prev => Math.max(prev - 0.1, 0.5))
+    }
+
+    const handleResetZoom = () => {
+        setScale(0.8)
+    }
+
     return (
         <div className="relative h-full">
             {error && (
@@ -90,6 +103,31 @@ const OfficeWebViewer = (props: OfficeWebViewerProps) => {
                     className="mb-4"
                 />
             )}
+            <div className="absolute top-2 right-2 z-20 flex gap-2">
+                <Button 
+                    size="small" 
+                    onClick={handleZoomOut}
+                    icon={<ZoomOutOutlined />}
+                    disabled={scale <= 0.5}
+                >
+                    缩小
+                </Button>
+                <Button 
+                    size="small" 
+                    onClick={handleResetZoom}
+                    disabled={scale === 0.8}
+                >
+                    {Math.round(scale * 100)}%
+                </Button>
+                <Button 
+                    size="small" 
+                    onClick={handleZoomIn}
+                    icon={<ZoomInOutlined />}
+                    disabled={scale >= 2}
+                >
+                    放大
+                </Button>
+            </div>
             {isLoading && !error && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-75 z-10">
                     <Spin size="large" />
@@ -99,16 +137,18 @@ const OfficeWebViewer = (props: OfficeWebViewerProps) => {
                     )}
                 </div>
             )}
-            <iframe
-                src={getOfficeWebViewerUrl(fileUrl)}
-                width="100%"
-                height="100%"
-                onLoad={handleIframeLoad}
-                onError={handleIframeError}
-                title="Office Document Preview"
-                style={{ minHeight: '750px', border: 'none' }}
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-            />
+            <div className="h-full overflow-auto" style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%`, height: `${100 / scale}%` }}>
+                <iframe
+                    src={getOfficeWebViewerUrl(fileUrl)}
+                    width="100%"
+                    height="100%"
+                    onLoad={handleIframeLoad}
+                    onError={handleIframeError}
+                    title="Office Document Preview"
+                    style={{ minHeight: '750px', border: 'none' }}
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                />
+            </div>
         </div>
     )
 }
@@ -134,9 +174,9 @@ const TemplatePreview = (props: TemplatePreviewProps) => {
                     关闭
                 </Button>
             ]}
-            width={900}
+            width="50vw"
             centered
-            styles={{ body: { height: '50vh', overflow: 'hidden', padding: '0' } }}
+            styles={{ body: { height: '70vh', overflow: 'hidden', padding: '0' } }}
         >
             {templateUrl && (
                 <OfficeWebViewer fileUrl={templateUrl} />
