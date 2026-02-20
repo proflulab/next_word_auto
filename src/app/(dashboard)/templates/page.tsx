@@ -246,6 +246,35 @@ export default function TemplatesPage() {
     }
   };
 
+  // 下载云端模板
+  const handleDownloadCloud = async (template: TemplateFile) => {
+    try {
+      if (!template.url) {
+        message.error('无法获取文件URL');
+        return;
+      }
+
+      const response = await fetch(template.url);
+      if (!response.ok) {
+        throw new Error('下载失败');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = template.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      message.success('下载成功');
+    } catch (error) {
+      console.error('下载失败:', error);
+      message.error('下载失败，请重试');
+    }
+  };
+
   // 上传配置
   const uploadProps: UploadProps = {
     name: 'file',
@@ -327,15 +356,19 @@ export default function TemplatesPage() {
               disabled={record.type === 'local'}
             />
           </Tooltip>
-          {record.type === 'local' && (
-            <Tooltip title="下载">
-              <Button
-                type="text"
-                icon={<DownloadOutlined />}
-                onClick={() => handleDownloadLocal(record)}
-              />
-            </Tooltip>
-          )}
+          <Tooltip title="下载">
+            <Button
+              type="text"
+              icon={<DownloadOutlined />}
+              onClick={() => {
+                if (record.type === 'cloud') {
+                  handleDownloadCloud(record);
+                } else {
+                  handleDownloadLocal(record);
+                }
+              }}
+            />
+          </Tooltip>
           <Popconfirm
             title="确定要删除这个模板吗？"
             onConfirm={() => {
