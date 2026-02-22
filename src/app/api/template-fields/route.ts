@@ -50,7 +50,39 @@ export async function POST(request: Request): Promise<NextResponse> {
             return NextResponse.json(
                 {
                     success: false,
-                    error: "缺少模板文件"
+                    error: "缺少模板文件",
+                    message: "请上传一个有效的.docx模板文件"
+                },
+                { status: 400 }
+            );
+        }
+
+        console.log('收到模板文件:', {
+            originalFilename: templateFile.originalFilename,
+            size: templateFile.size,
+            mimetype: templateFile.mimetype
+        });
+
+        // 验证文件大小
+        if (templateFile.size === 0) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: "模板文件为空",
+                    message: "上传的模板文件大小为0，请检查文件是否正确"
+                },
+                { status: 400 }
+            );
+        }
+
+        // 验证文件扩展名
+        const filename = templateFile.originalFilename || '';
+        if (!filename.toLowerCase().endsWith('.docx')) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: "文件格式错误",
+                    message: "只支持.docx格式的Word文档模板"
                 },
                 { status: 400 }
             );
@@ -58,21 +90,48 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         // 读取模板文件内容
         const templateBuffer = await fs.promises.readFile(templateFile.filepath);
+        
+        console.log('模板文件读取成功，大小:', templateBuffer.length);
 
         // 解析模板字段
-        const templateFields = await getTemplateFields(templateBuffer, 'buffer');
+        try {
+            const templateFields = await getTemplateFields(templateBuffer, 'buffer');
+            
+            console.log('成功解析模板字段:', templateFields);
 
-        return NextResponse.json({
-            success: true,
-            fields: templateFields
-        });
+            if (!templateFields || templateFields.length === 0) {
+                return NextResponse.json({
+                    success: true,
+                    fields: [],
+                    message: '模板中没有找到字段占位符。请确保使用 {字段名} 格式的占位符。'
+                });
+            }
+
+            return NextResponse.json({
+                success: true,
+                fields: templateFields,
+                message: `成功识别 ${templateFields.length} 个字段`
+            });
+        } catch (parseError) {
+            console.error('解析模板字段时出错:', parseError);
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: '模板解析失败',
+                    message: parseError instanceof Error ? parseError.message : '模板格式可能不正确，请确保是有效的.docx文件',
+                    details: parseError instanceof Error ? parseError.stack : undefined
+                },
+                { status: 500 }
+            );
+        }
     } catch (error) {
         console.error('获取模板字段失败:', error);
         return NextResponse.json(
             {
                 success: false,
                 error: '获取模板字段失败',
-                message: error instanceof Error ? error.message : '未知错误'
+                message: error instanceof Error ? error.message : '未知错误',
+                details: error instanceof Error ? error.stack : undefined
             },
             { status: 500 }
         );

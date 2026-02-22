@@ -27,6 +27,10 @@ export default function BatchPage() {
   const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [batchInputText, setBatchInputText] = useState<string>('');
+  const [showCountSelector, setShowCountSelector] = useState(false);
+  const [templateCount, setTemplateCount] = useState<number>(1);
+  const [customCount, setCustomCount] = useState<string>('');
+  const [importMode, setImportMode] = useState<'replace' | 'append'>('replace');
 
   const fetchCloudTemplates = useCallback(async () => {
     setIsLoadingTemplates(true);
@@ -92,18 +96,77 @@ export default function BatchPage() {
       message.warning('请先选择一个模板');
       return;
     }
+    setShowCountSelector(true);
+  };
+
+  const generateTemplates = async () => {
+    // 确定实际要生成的数量
+    let actualCount = templateCount;
+    if (templateCount === 0) {
+      const parsed = parseInt(customCount);
+      if (isNaN(parsed) || parsed < 1 || parsed > 1000) {
+        message.error('请输入有效的数量（1-1000）');
+        return;
+      }
+      actualCount = parsed;
+    }
+
     setIsAutoConfiguring(true);
     const hideLoading = message.loading('正在分析模板字段...', 0);
     try {
       const selectedTemplate = cloudTemplates.find((t: CloudTemplate) => t.name === cloudTemplateName);
       if (!selectedTemplate) throw new Error('指定的模板文件不存在');
+      
+      // 验证模板URL
+      console.log('模板信息:', {
+        name: selectedTemplate.name,
+        url: selectedTemplate.url,
+        size: selectedTemplate.size
+      });
+      
       const templateResponse = await fetch(selectedTemplate.url);
+      if (!templateResponse.ok) {
+        throw new Error(`获取模板失败: ${templateResponse.status} ${templateResponse.statusText}`);
+      }
+      
       const templateBlob = await templateResponse.blob();
+      console.log('模板Blob信息:', {
+        size: templateBlob.size,
+        type: templateBlob.type
+      });
+      
+      // 验证是否是有效的docx文件
+      if (templateBlob.size === 0) {
+        throw new Error('模板文件为空');
+      }
+      
+      if (!templateBlob.type.includes('wordprocessingml') && 
+          !templateBlob.type.includes('officedocument') &&
+          !templateBlob.type.includes('octet-stream')) {
+        console.warn('模板文件类型可能不正确:', templateBlob.type);
+      }
+      
       const formData = new FormData();
       formData.append('template', templateBlob, cloudTemplateName);
+      
       const response = await fetch('/api/template-fields', { method: 'POST', body: formData });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API响应错误:', errorText);
+        throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+      }
+      
       const result = await response.json();
+      console.log('API返回结果:', result);
+      
       if (result.success && result.fields) {
+        if (result.fields.length === 0) {
+          hideLoading();
+          message.warning('模板中没有找到任何字段，请确保模板使用了 {字段名} 格式的占位符');
+          return;
+        }
+        
         const autoFields: FieldConfig[] = result.fields.map((fieldName: string, index: number) => ({
           id: `auto_${Date.now()}_${index}`,
           name: fieldName,
@@ -113,16 +176,65 @@ export default function BatchPage() {
           format: {},
         }));
         setFields(autoFields);
+        
+        // 生成对应数量的模板数据
+        const templates: Array<Record<string, string | number | boolean | null | undefined>> = [];
+        for (let i = 0; i < actualCount; i++) {
+          const template: Record<string, string | number | boolean | null | undefined> = {};
+          result.fields.forEach((fieldName: string) => {
+            template[fieldName] = '';
+          });
+          templates.push(template);
+        }
+        
+        // 将模板转换为格式化的JSON字符串（用于显示）
+        const jsonTemplates = templates.map((template) => 
+          JSON.stringify(template, null, 2)
+        ).join(',\n');
+        
+        setBatchInputText(jsonTemplates);
+        
+        // 自动将模板添加到数据列表中
+        setBatchDataList([...batchDataList, ...templates]);
+        
+        setShowCountSelector(false);
+        setTemplateCount(1);
+        setCustomCount('');
+        
         hideLoading();
-        message.success({ content: `🎉 成功自动配置 ${result.fields.length} 个字段！`, duration: 3 });
+        message.success({ content: `🎉 成功生成 ${actualCount} 个配置模板！已添加到数据列表，可在JSON区域编辑后点击"更新数据"`, duration: 5 });
       } else {
         hideLoading();
-        message.error({ content: result.message || '❌ 获取模板字段失败，请检查模板格式', duration: 4 });
+        message.error({ 
+          content: result.message || '❌ 获取模板字段失败，请检查模板格式', 
+          duration: 6 
+        });
+        
+        // 提供更详细的错误信息
+        if (result.error) {
+          console.error('详细错误:', result.error);
+          message.info({
+            content: `提示：请确保模板是有效的.docx文件，并使用 {字段名} 格式的占位符`,
+            duration: 8
+          });
+        }
       }
     } catch (error) {
       console.error('自动配置字段失败:', error);
       hideLoading();
-      message.error({ content: '❌ 自动配置字段失败，请检查网络连接后重试', duration: 4 });
+      
+      let errorMessage = '❌ 自动配置字段失败';
+      if (error instanceof Error) {
+        errorMessage += `: ${error.message}`;
+      }
+      
+      message.error({ content: errorMessage, duration: 6 });
+      
+      // 提供故障排除建议
+      message.info({
+        content: '故障排除：1) 确认模板文件可访问 2) 检查模板是否为有效的.docx格式 3) 确保使用了 {字段名} 占位符',
+        duration: 10
+      });
     } finally {
       setIsAutoConfiguring(false);
     }
@@ -187,9 +299,15 @@ export default function BatchPage() {
         message.warning('没有有效的数据');
         return;
       }
-      setBatchDataList([...batchDataList, ...newBatchData]);
+      // 根据导入模式决定是替换还是追加
+      if (importMode === 'replace') {
+        setBatchDataList(newBatchData);
+        message.success(`成功导入 ${newBatchData.length} 条数据（已替换原有数据）`);
+      } else {
+        setBatchDataList([...batchDataList, ...newBatchData]);
+        message.success(`成功追加 ${newBatchData.length} 条数据（总计 ${batchDataList.length + newBatchData.length} 条）`);
+      }
       setBatchInputText('');
-      message.success(`成功添加 ${newBatchData.length} 条数据`);
     } catch (error) {
       console.error('JSON解析错误:', error);
       message.error('数据格式错误，请检查JSON格式。支持单引号和双引号，以及未引用的属性名');
@@ -290,6 +408,68 @@ export default function BatchPage() {
             </div>
           </Card>
 
+          {/* 生成数量选择器 */}
+          {showCountSelector && (
+            <Card className="mb-6 border-2 border-blue-400 shadow-lg">
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="text-lg font-medium text-gray-800 mb-4">选择需要生成的文档数量</div>
+                  <div className="flex items-center justify-center gap-4">
+                    <label className="text-sm font-medium text-gray-700">数量：</label>
+                    <Select
+                      value={templateCount === 0 ? 'custom' : templateCount}
+                      onChange={(value) => {
+                        if (value === 'custom') {
+                          setTemplateCount(0);
+                        } else {
+                          setTemplateCount(value as number);
+                          setCustomCount('');
+                        }
+                      }}
+                      className="w-32"
+                      options={[
+                        { label: '1 个', value: 1 },
+                        { label: '2 个', value: 2 },
+                        { label: '3 个', value: 3 },
+                        { label: '5 个', value: 5 },
+                        { label: '10 个', value: 10 },
+                        { label: '20 个', value: 20 },
+                        { label: '50 个', value: 50 },
+                        { label: '自定义', value: 'custom' },
+                      ]}
+                    />
+                    {templateCount === 0 && (
+                      <Input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        value={customCount}
+                        onChange={(e) => setCustomCount(e.target.value)}
+                        placeholder="输入数量"
+                        className="w-32"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-center gap-3">
+                  <Button onClick={() => {
+                    setShowCountSelector(false);
+                    setTemplateCount(1);
+                    setCustomCount('');
+                  }}>取消</Button>
+                  <Button 
+                    type="primary" 
+                    onClick={generateTemplates} 
+                    loading={isAutoConfiguring}
+                    disabled={templateCount === 0 && !customCount}
+                  >
+                    生成配置模板
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* 字段配置 */}
           <Card title={(<div className="flex items-center justify-between"><span>字段配置</span><Space><Button type="primary" size="small" icon={<SettingOutlined />} onClick={autoConfigureFields} disabled={!cloudTemplateName || isAutoConfiguring} loading={isAutoConfiguring}>{isAutoConfiguring ? '配置中...' : '自动配置'}</Button><Popconfirm title="确定要删除所有字段吗？" description="此操作不可撤销，将清空所有字段配置。" onConfirm={() => setFields([])} okText="确定" cancelText="取消" disabled={fields.length === 0}><Button danger size="small" icon={<DeleteOutlined />} disabled={fields.length === 0}>清空所有</Button></Popconfirm></Space></div>)} className="mb-6">
             <div className="space-y-3">
@@ -319,25 +499,45 @@ export default function BatchPage() {
 
           {/* 数据导入 */}
           {fields.length > 0 && (
-            <Card title="数据导入" className="mb-6">
+            <Card title="数据导入与编辑" className="mb-6">
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="text-sm text-gray-700">
-                    <div className="font-medium mb-2">导入格式说明：</div>
+                    <div className="font-medium mb-2">使用说明：</div>
                     <div className="text-xs text-gray-600 space-y-1">
-                      <div>💡 每个 {'{}'} 中间为一条数据记录</div>
-                      <div>💡 每个字段用 &quot;字段名&quot;: &quot;值&quot; 的格式表示</div>
-                      <div>💡 多条数据用逗号分隔或用 {'[]'} 包装</div>
+                      <div>💡 点击"自动配置"后会自动生成模板并显示在下方</div>
+                      <div>💡 在JSON区域编辑数据，填写各字段的值</div>
+                      <div>💡 编辑完成后点击"更新数据"应用修改</div>
+                      <div>💡 每个 {'{}'} 为一条记录，字段格式：&quot;字段名&quot;: &quot;值&quot;</div>
                     </div>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">粘贴JSON数据</label>
-                  <Input.TextArea value={batchInputText} onChange={(e) => setBatchInputText(e.target.value)} placeholder={`粘贴JSON格式的数据，例如：\n{"name": "张三", "age": 25},\n{"name": "李四", "age": 30}`} rows={8} />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    编辑JSON数据 {batchDataList.length > 0 && <span className="text-blue-600">（当前已有 {batchDataList.length} 条数据）</span>}
+                  </label>
+                  <Input.TextArea value={batchInputText} onChange={(e) => setBatchInputText(e.target.value)} placeholder={`粘贴或编辑JSON格式的数据，例如：\n{"name": "张三", "age": 25},\n{"name": "李四", "age": 30}`} rows={8} />
                 </div>
-                <div className="flex gap-2 justify-end">
-                  <Button onClick={() => setBatchInputText('')}>清空</Button>
-                  <Button type="primary" icon={<UploadOutlined />} onClick={parseJsonData}>导入数据</Button>
+                <div className="flex gap-2 justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">导入模式：</span>
+                    <Select
+                      value={importMode}
+                      onChange={(value) => setImportMode(value)}
+                      className="w-32"
+                      size="small"
+                      options={[
+                        { label: '替换数据', value: 'replace' },
+                        { label: '追加数据', value: 'append' },
+                      ]}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => setBatchInputText('')}>清空编辑区</Button>
+                    <Button type="primary" icon={<UploadOutlined />} onClick={parseJsonData}>
+                      {importMode === 'replace' ? '更新数据' : '追加数据'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>
