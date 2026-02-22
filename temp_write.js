@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+const fs = require('fs');
+
+const content = `import React, { useState } from 'react';
 import { Modal, Spin, Alert, Button } from 'antd';
 import { ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
 
@@ -22,7 +24,7 @@ const OfficeViewer = ({ fileUrl }) => {
     
     const getOfficeWebViewerUrl = (url) => {
         const encodedUrl = encodeURIComponent(url);
-        return `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+        return \`https://view.officeapps.live.com/op/embed.aspx?src=\${encodedUrl}\`;
     };
 
     return (
@@ -58,7 +60,7 @@ const PDFViewer = ({ fileUrl }) => {
                 </div>
             )}
             <iframe
-                src={`${fileUrl}#view=FitH`}
+                src={\`\${fileUrl}#view=FitH\`}
                 width="100%"
                 height="100%"
                 onLoad={() => setIsLoading(false)}
@@ -79,7 +81,7 @@ const ImageViewer = ({ fileUrl }) => {
                 <Button size="small" onClick={() => setScale(p => Math.min(p + 0.2, 3))} icon={<ZoomInOutlined />}>放大</Button>
             </div>
             <div className="flex-1 flex items-center justify-center p-4">
-                <img src={fileUrl} alt="Preview" style={{ transform: `scale(${scale})`, maxWidth: '100%', maxHeight: '100%' }} />
+                <img src={fileUrl} alt="Preview" style={{ transform: \`scale(\${scale})\`, maxWidth: '100%', maxHeight: '100%' }} />
             </div>
         </div>
     );
@@ -100,7 +102,7 @@ const UniversalViewer = ({ fileUrl }) => {
 const TemplatePreview = ({ visible, onClose, templateUrl, templateName }) => {
     return (
         <Modal
-            title={`模板预览 - ${templateName}`}
+            title={\`模板预览 - \${templateName}\`}
             open={visible}
             onCancel={onClose}
             footer={[<Button key="close" onClick={onClose}>关闭</Button>]}
@@ -114,3 +116,7 @@ const TemplatePreview = ({ visible, onClose, templateUrl, templateName }) => {
 };
 
 export default TemplatePreview;
+`;
+
+fs.writeFileSync('src/components/preview/TemplatePreview.tsx', content, 'utf8');
+console.log('File written successfully');
