@@ -505,9 +505,9 @@ export default function BatchPage() {
                   <div className="text-sm text-gray-700">
                     <div className="font-medium mb-2">使用说明：</div>
                     <div className="text-xs text-gray-600 space-y-1">
-                      <div>💡 点击"自动配置"后会自动生成模板并显示在下方</div>
+                      <div>💡 点击&quot;自动配置&quot;后会自动生成模板并显示在下方</div>
                       <div>💡 在JSON区域编辑数据，填写各字段的值</div>
-                      <div>💡 编辑完成后点击"更新数据"应用修改</div>
+                      <div>💡 编辑完成后点击&quot;更新数据&quot;应用修改</div>
                       <div>💡 每个 {'{}'} 为一条记录，字段格式：&quot;字段名&quot;: &quot;值&quot;</div>
                     </div>
                   </div>
