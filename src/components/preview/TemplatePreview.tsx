@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Modal, Spin, Alert, Button } from 'antd';
 import { ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons';
 
-const getFileExtension = (url) => {
+const getFileExtension = (url: string): string => {
     const urlWithoutQuery = url.split('?')[0];
     const parts = urlWithoutQuery.split('.');
     return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
 };
 
-const getFileType = (url) => {
+const getFileType = (url: string): 'office' | 'pdf' | 'image' | 'unknown' => {
     const ext = getFileExtension(url);
     if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'office';
     if (ext === 'pdf') return 'pdf';
@@ -16,11 +16,15 @@ const getFileType = (url) => {
     return 'unknown';
 };
 
-const OfficeViewer = ({ fileUrl }) => {
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
+interface OfficeViewerProps {
+    fileUrl: string;
+}
+
+const OfficeViewer: React.FC<OfficeViewerProps> = ({ fileUrl }) => {
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
     
-    const getOfficeWebViewerUrl = (url) => {
+    const getOfficeWebViewerUrl = (url: string): string => {
         const encodedUrl = encodeURIComponent(url);
         return `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
     };
@@ -48,8 +52,8 @@ const OfficeViewer = ({ fileUrl }) => {
     );
 };
 
-const PDFViewer = ({ fileUrl }) => {
-    const [isLoading, setIsLoading] = useState(true);
+const PDFViewer: React.FC<{ fileUrl: string }> = ({ fileUrl }) => {
+    const [isLoading, setIsLoading] = useState<boolean>(true);
     return (
         <div className="relative h-full">
             {isLoading && (
@@ -69,8 +73,8 @@ const PDFViewer = ({ fileUrl }) => {
     );
 };
 
-const ImageViewer = ({ fileUrl }) => {
-    const [scale, setScale] = useState(1);
+const ImageViewer: React.FC<{ fileUrl: string }> = ({ fileUrl }) => {
+    const [scale, setScale] = useState<number>(1);
     return (
         <div className="relative h-full flex flex-col bg-gray-100">
             <div className="absolute top-2 right-2 z-20 flex gap-2">
@@ -85,7 +89,7 @@ const ImageViewer = ({ fileUrl }) => {
     );
 };
 
-const UniversalViewer = ({ fileUrl }) => {
+const UniversalViewer: React.FC<{ fileUrl: string }> = ({ fileUrl }) => {
     const fileType = getFileType(fileUrl);
     if (fileType === 'office') return <OfficeViewer fileUrl={fileUrl} />;
     if (fileType === 'pdf') return <PDFViewer fileUrl={fileUrl} />;
@@ -97,7 +101,14 @@ const UniversalViewer = ({ fileUrl }) => {
     );
 };
 
-const TemplatePreview = ({ visible, onClose, templateUrl, templateName }) => {
+interface TemplatePreviewProps {
+    visible: boolean;
+    onClose: () => void;
+    templateUrl: string;
+    templateName: string;
+}
+
+const TemplatePreview: React.FC<TemplatePreviewProps> = ({ visible, onClose, templateUrl, templateName }) => {
     return (
         <Modal
             title={`模板预览 - ${templateName}`}
