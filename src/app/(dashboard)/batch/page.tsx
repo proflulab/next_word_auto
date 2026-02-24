@@ -1,20 +1,16 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Button, Card, Space, Typography, message, Popconfirm, Select, Input, Checkbox } from 'antd';
-import { PlusOutlined, DeleteOutlined, CloudOutlined, SettingOutlined, EyeOutlined, DownloadOutlined, FilePdfOutlined, UploadOutlined } from '@ant-design/icons';
+import { Button, Card, Space, Typography, message, Popconfirm, Select, Input } from 'antd';
+import { CloudOutlined, SettingOutlined, EyeOutlined, DownloadOutlined, FilePdfOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons';
 import TemplatePreview from '@/components/preview/TemplatePreview';
-import { FIELD_TYPES, DEFAULT_FIELDS } from '@/constants/fields';
-import { CURRENCY_OPTIONS } from '@/constants/currencies';
-import { FieldConfig, CloudTemplate } from '@/types';
-import { inferFieldType } from '@/utils/fieldTypeInference';
+import { CloudTemplate } from '@/types';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 
 const { Title } = Typography;
 
 export default function BatchPage() {
-  const [fields, setFields] = useState<FieldConfig[]>(DEFAULT_FIELDS);
   const [batchDataList, setBatchDataList] = useState<Array<Record<string, string | number | boolean | null | undefined>>>([]);
   const [cloudTemplateName, setCloudTemplateName] = useState<string>('');
   const [cloudTemplates, setCloudTemplates] = useState<CloudTemplate[]>([]);
@@ -68,28 +64,6 @@ export default function BatchPage() {
     initializeComponent();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const addField = () => {
-    const newField: FieldConfig = {
-      id: Date.now().toString(),
-      name: `field_${Date.now()}`,
-      type: 'text',
-      value: '',
-      required: false,
-      format: {},
-    };
-    setFields([...fields, newField]);
-  };
-
-  const deleteField = (id: string) => {
-    setFields(fields.filter(field => field.id !== id));
-  };
-
-  const updateField = (id: string, updates: Partial<FieldConfig>) => {
-    setFields(fields.map(field =>
-      field.id === id ? { ...field, ...updates } : field
-    ));
-  };
 
   const autoConfigureFields = async () => {
     if (!cloudTemplateName) {
@@ -167,16 +141,6 @@ export default function BatchPage() {
           return;
         }
         
-        const autoFields: FieldConfig[] = result.fields.map((fieldName: string, index: number) => ({
-          id: `auto_${Date.now()}_${index}`,
-          name: fieldName,
-          type: inferFieldType(fieldName),
-          value: '',
-          required: false,
-          format: {},
-        }));
-        setFields(autoFields);
-        
         // 生成对应数量的模板数据
         const templates: Array<Record<string, string | number | boolean | null | undefined>> = [];
         for (let i = 0; i < actualCount; i++) {
@@ -237,28 +201,6 @@ export default function BatchPage() {
       });
     } finally {
       setIsAutoConfiguring(false);
-    }
-  };
-
-  const renderFormatConfig = (field: FieldConfig) => {
-    switch (field.type) {
-      case 'currency':
-        return (
-          <div className="flex gap-2">
-            <Select value={field.format?.currencySymbol || 'CNY'} onChange={(value) => updateField(field.id, { format: { ...field.format, currencySymbol: value } })} size="small" className="w-20" options={CURRENCY_OPTIONS} />
-            <Select value={field.format?.decimalPlaces ?? 2} onChange={(value) => updateField(field.id, { format: { ...field.format, decimalPlaces: value } })} size="small" className="w-20" options={[{ label: '0位', value: 0 }, { label: '1位', value: 1 }, { label: '2位', value: 2 }, { label: '3位', value: 3 }]} />
-          </div>
-        );
-      case 'date':
-        return (
-          <Select value={field.format?.dateFormat || 'YYYY-MM-DD'} onChange={(value) => updateField(field.id, { format: { ...field.format, dateFormat: value } })} size="small" className="w-full" options={[{ label: '2024-01-01', value: 'YYYY-MM-DD' }, { label: '2024/01/01', value: 'YYYY/MM/DD' }, { label: '01/01/2024', value: 'MM/DD/YYYY' }, { label: '2024年1月1日', value: 'YYYY年M月D日' }]} />
-        );
-      case 'number':
-        return (
-          <Select value={field.format?.numberFormat || 'normal'} onChange={(value) => updateField(field.id, { format: { ...field.format, numberFormat: value } })} size="small" className="w-full" options={[{ label: '普通数字', value: 'normal' }, { label: '千分位', value: 'thousand' }, { label: '百分比', value: 'percent' }]} />
-        );
-      default:
-        return <span className="text-xs text-gray-400">无格式选项</span>;
     }
   };
 
@@ -405,6 +347,11 @@ export default function BatchPage() {
                   <Button icon={<EyeOutlined />} onClick={() => { if (cloudTemplateName) { const selectedTemplate = cloudTemplates.find(t => t.name === cloudTemplateName); if (selectedTemplate) { setPreviewTemplateUrl(selectedTemplate.url); setPreviewVisible(true); } } else { message.warning('请先选择一个模板'); } }} disabled={!cloudTemplateName || isLoadingTemplates} title="预览模板">预览</Button>
                 </div>
               </div>
+              <div className="flex justify-end">
+                <Button type="primary" icon={<SettingOutlined />} onClick={autoConfigureFields} disabled={!cloudTemplateName || isAutoConfiguring} loading={isAutoConfiguring}>
+                  {isAutoConfiguring ? '配置中...' : '自动配置'}
+                </Button>
+              </div>
             </div>
           </Card>
 
@@ -470,36 +417,8 @@ export default function BatchPage() {
             </Card>
           )}
 
-          {/* 字段配置 */}
-          <Card title={(<div className="flex items-center justify-between"><span>字段配置</span><Space><Button type="primary" size="small" icon={<SettingOutlined />} onClick={autoConfigureFields} disabled={!cloudTemplateName || isAutoConfiguring} loading={isAutoConfiguring}>{isAutoConfiguring ? '配置中...' : '自动配置'}</Button><Popconfirm title="确定要删除所有字段吗？" description="此操作不可撤销，将清空所有字段配置。" onConfirm={() => setFields([])} okText="确定" cancelText="取消" disabled={fields.length === 0}><Button danger size="small" icon={<DeleteOutlined />} disabled={fields.length === 0}>清空所有</Button></Popconfirm></Space></div>)} className="mb-6">
-            <div className="space-y-3">
-              {fields.length > 0 && (
-                <div className="hidden lg:block">
-                  <div className="grid grid-cols-12 gap-3 px-4 py-2 bg-gray-50 rounded-lg text-xs font-medium text-gray-600">
-                    <div className="col-span-2">字段名称</div>
-                    <div className="col-span-2">字段类型</div>
-                    <div className="col-span-2">格式</div>
-                    <div className="col-span-1">必填</div>
-                    <div className="col-span-4">操作</div>
-                  </div>
-                </div>
-              )}
-              {fields.map((field) => (
-                <div key={field.id} className="grid grid-cols-12 gap-3 items-center">
-                  <div className="col-span-12 lg:col-span-2"><Input value={field.name} onChange={(e) => updateField(field.id, { name: e.target.value })} placeholder="字段名称" size="small" /></div>
-                  <div className="col-span-12 lg:col-span-2"><Select value={field.type} onChange={(value) => updateField(field.id, { type: value })} className="w-full" size="small" options={FIELD_TYPES} /></div>
-                  <div className="col-span-12 lg:col-span-2">{renderFormatConfig(field)}</div>
-                  <div className="col-span-12 lg:col-span-1"><Checkbox checked={field.required} onChange={(e) => updateField(field.id, { required: e.target.checked })} /></div>
-                  <div className="col-span-12 lg:col-span-4"><Space><Popconfirm title="确定要删除此字段吗？" onConfirm={() => deleteField(field.id)} okText="确定" cancelText="取消"><Button danger size="small" icon={<DeleteOutlined />} type="text" /></Popconfirm></Space></div>
-                </div>
-              ))}
-              <Button type="dashed" block icon={<PlusOutlined />} onClick={addField} className="mt-4">添加字段</Button>
-            </div>
-          </Card>
-
-          {/* 数据导入 */}
-          {fields.length > 0 && (
-            <Card title="数据导入与编辑" className="mb-6">
+          {/* 数据导入与编辑 */}
+          <Card title="数据导入与编辑" className="mb-6">
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="text-sm text-gray-700">
@@ -541,7 +460,6 @@ export default function BatchPage() {
                 </div>
               </div>
             </Card>
-          )}
 
           {/* 数据列表 */}
           {batchDataList.length > 0 && (
