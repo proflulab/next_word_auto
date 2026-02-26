@@ -46,6 +46,7 @@ import {
   formatFileSize,
   isLocalCacheSupported
 } from '@/utils/localCache';
+import TemplatePreview from '@/components/preview/TemplatePreview';
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
@@ -480,27 +481,12 @@ export default function TemplatesPage() {
         </Card>
 
         {/* 预览模态框 */}
-        <Modal
-          title={`预览模板: ${previewName}`}
-          open={previewVisible}
-          onCancel={() => setPreviewVisible(false)}
-          footer={[
-            <Button key="close" onClick={() => setPreviewVisible(false)}>
-              关闭
-            </Button>
-          ]}
-          width={800}
-        >
-          {previewUrl && (
-            <div className="text-center">
-              <Text type="secondary">模板文件预览</Text>
-              <div className="mt-4 p-4 bg-gray-50 rounded">
-                <Text>文件 URL: </Text>
-                <Text code copyable>{previewUrl}</Text>
-              </div>
-            </div>
-          )}
-        </Modal>
+        <TemplatePreview
+          visible={previewVisible}
+          onClose={() => setPreviewVisible(false)}
+          templateUrl={previewUrl}
+          templateName={previewName}
+        />
       </main>
     </div>
   );
