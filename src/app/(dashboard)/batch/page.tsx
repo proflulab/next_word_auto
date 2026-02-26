@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { Button, Card, Space, Typography, message, Popconfirm, Select, Input } from 'antd';
-import { CloudOutlined, SettingOutlined, EyeOutlined, DownloadOutlined, FilePdfOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { CloudOutlined, SettingOutlined, EyeOutlined, DownloadOutlined, FilePdfOutlined, DeleteOutlined } from '@ant-design/icons';
 import TemplatePreview from '@/components/preview/TemplatePreview';
 import { CloudTemplate } from '@/types';
 import { saveAs } from 'file-saver';
@@ -22,11 +22,8 @@ export default function BatchPage() {
   const [templateSource, setTemplateSource] = useState<string>('blob');
   const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [batchInputText, setBatchInputText] = useState<string>('');
-  const [showCountSelector, setShowCountSelector] = useState(false);
-  const [templateCount, setTemplateCount] = useState<number>(1);
-  const [customCount, setCustomCount] = useState<string>('');
-  const [importMode, setImportMode] = useState<'replace' | 'append'>('replace');
+  const [recentlyAddedCount, setRecentlyAddedCount] = useState<number>(0);
+  const [fields, setFields] = useState<Array<{ name: string; values: string }>>([]);
 
   const fetchCloudTemplates = useCallback(async () => {
     setIsLoadingTemplates(true);
@@ -65,24 +62,10 @@ export default function BatchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const autoConfigureFields = async () => {
+  const generateTemplates = async () => {
     if (!cloudTemplateName) {
       message.warning('请先选择一个模板');
       return;
-    }
-    setShowCountSelector(true);
-  };
-
-  const generateTemplates = async () => {
-    // 确定实际要生成的数量
-    let actualCount = templateCount;
-    if (templateCount === 0) {
-      const parsed = parseInt(customCount);
-      if (isNaN(parsed) || parsed < 1 || parsed > 1000) {
-        message.error('请输入有效的数量（1-1000）');
-        return;
-      }
-      actualCount = parsed;
     }
 
     setIsAutoConfiguring(true);
@@ -141,32 +124,18 @@ export default function BatchPage() {
           return;
         }
         
-        // 生成对应数量的模板数据
-        const templates: Array<Record<string, string | number | boolean | null | undefined>> = [];
-        for (let i = 0; i < actualCount; i++) {
-          const template: Record<string, string | number | boolean | null | undefined> = {};
-          result.fields.forEach((fieldName: string) => {
-            template[fieldName] = '';
-          });
-          templates.push(template);
-        }
+        // 生成字段配置（每个字段一个多行输入框）
+        const fieldConfigs = result.fields.map((fieldName: string) => ({
+          name: fieldName,
+          values: ''
+        }));
         
-        // 将模板转换为格式化的JSON字符串（用于显示）
-        const jsonTemplates = templates.map((template) => 
-          JSON.stringify(template, null, 2)
-        ).join(',\n');
-        
-        setBatchInputText(jsonTemplates);
-        
-        // 自动将模板添加到数据列表中
-        setBatchDataList([...batchDataList, ...templates]);
-        
-        setShowCountSelector(false);
-        setTemplateCount(1);
-        setCustomCount('');
+        setFields(fieldConfigs);
+        setBatchDataList([]);
+        setRecentlyAddedCount(0);
         
         hideLoading();
-        message.success({ content: `🎉 成功生成 ${actualCount} 个配置模板！已添加到数据列表，可在JSON区域编辑后点击"更新数据"`, duration: 5 });
+        message.success({ content: `🎉 成功识别 ${result.fields.length} 个字段！请在下方为每个字段输入多条值（每行一个值）`, duration: 5 });
       } else {
         hideLoading();
         message.error({ 
@@ -204,56 +173,50 @@ export default function BatchPage() {
     }
   };
 
-  const parseJsonData = () => {
-    if (!batchInputText.trim()) {
-      message.warning('请输入数据');
+  const generateDataFromFields = () => {
+    if (fields.length === 0) {
+      message.warning('请先生成字段配置');
       return;
     }
-    try {
-      let data: Record<string, unknown>[] | Record<string, unknown>;
-      let trimmedText = batchInputText.trim();
-      trimmedText = trimmedText.replace(/'/g, '"').replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
-      try {
-        if (trimmedText.startsWith('[')) {
-          data = JSON.parse(trimmedText);
-        } else {
-          data = JSON.parse(`[${trimmedText}]`);
-        }
-      } catch {
-        const objectMatches = trimmedText.match(/\{[^{}]*\}/g);
-        if (objectMatches && objectMatches.length > 0) {
-          data = objectMatches.map(obj => JSON.parse(obj));
-        } else {
-          throw new Error('无法解析JSON格式，请检查数据格式');
-        }
-      }
-      if (!Array.isArray(data)) data = [data];
-      const newBatchData: Array<Record<string, string | number | boolean | null | undefined>> = [];
-      data.forEach((item: Record<string, unknown>, index: number) => {
-        if (typeof item !== 'object' || item === null) throw new Error(`第 ${index + 1} 项不是有效的对象`);
-        const record: Record<string, string | number | boolean | null | undefined> = {};
-        Object.entries(item).forEach(([key, value]) => {
-          record[key] = value as string | number | boolean | null | undefined;
-        });
-        newBatchData.push(record);
-      });
-      if (newBatchData.length === 0) {
-        message.warning('没有有效的数据');
-        return;
-      }
-      // 根据导入模式决定是替换还是追加
-      if (importMode === 'replace') {
-        setBatchDataList(newBatchData);
-        message.success(`成功导入 ${newBatchData.length} 条数据（已替换原有数据）`);
-      } else {
-        setBatchDataList([...batchDataList, ...newBatchData]);
-        message.success(`成功追加 ${newBatchData.length} 条数据（总计 ${batchDataList.length + newBatchData.length} 条）`);
-      }
-      setBatchInputText('');
-    } catch (error) {
-      console.error('JSON解析错误:', error);
-      message.error('数据格式错误，请检查JSON格式。支持单引号和双引号，以及未引用的属性名');
+
+    // 解析每个字段的值（按行分割）
+    const fieldValueArrays: Record<string, string[]> = {};
+    let maxLength = 0;
+
+    fields.forEach(field => {
+      const values = field.values
+        .split('\n')
+        .map(v => v.trim())
+        .filter(v => v !== '');
+      fieldValueArrays[field.name] = values;
+      maxLength = Math.max(maxLength, values.length);
+    });
+
+    if (maxLength === 0) {
+      message.warning('请至少为一个字段输入值');
+      return;
     }
+
+    // 生成数据列表
+    const newDataList: Array<Record<string, string | number | boolean | null | undefined>> = [];
+    for (let i = 0; i < maxLength; i++) {
+      const record: Record<string, string | number | boolean | null | undefined> = {};
+      fields.forEach(field => {
+        const values = fieldValueArrays[field.name];
+        // 如果某个字段的值不够，使用最后一个值或空字符串
+        record[field.name] = values[i] || values[values.length - 1] || '';
+      });
+      newDataList.push(record);
+    }
+
+    setBatchDataList(newDataList);
+    setRecentlyAddedCount(newDataList.length);
+    message.success(`成功生成 ${newDataList.length} 条数据`);
+  };
+
+  const updateFieldValues = (fieldName: string, values: string) => {
+    setFields(fields.map(f => f.name === fieldName ? { ...f, values } : f));
+    setRecentlyAddedCount(0);
   };
 
   const deleteBatchData = (index: number) => {
@@ -333,8 +296,8 @@ export default function BatchPage() {
         <Card>
           <Title level={2} className="text-center mb-8">批量文档生成</Title>
 
-          {/* 模板配置 */}
-          <Card title="模板配置" className="mb-6">
+          {/* 模板配置与生成 */}
+          <Card title="模板配置与生成" className="mb-6">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">模板来源</label>
@@ -347,119 +310,88 @@ export default function BatchPage() {
                   <Button icon={<EyeOutlined />} onClick={() => { if (cloudTemplateName) { const selectedTemplate = cloudTemplates.find(t => t.name === cloudTemplateName); if (selectedTemplate) { setPreviewTemplateUrl(selectedTemplate.url); setPreviewVisible(true); } } else { message.warning('请先选择一个模板'); } }} disabled={!cloudTemplateName || isLoadingTemplates} title="预览模板">预览</Button>
                 </div>
               </div>
-              <div className="flex justify-end">
-                <Button type="primary" icon={<SettingOutlined />} onClick={autoConfigureFields} disabled={!cloudTemplateName || isAutoConfiguring} loading={isAutoConfiguring}>
-                  {isAutoConfiguring ? '配置中...' : '自动配置'}
-                </Button>
+              
+              {/* 生成数量选择 */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-gray-800">生成字段配置</div>
+                  <div className="flex items-center gap-4">
+                    <Button 
+                      type="primary" 
+                      icon={<SettingOutlined />}
+                      onClick={generateTemplates} 
+                      loading={isAutoConfiguring}
+                      disabled={!cloudTemplateName}
+                    >
+                      {isAutoConfiguring ? '生成中...' : '自动配置字段'}
+                    </Button>
+                  </div>
+                  {recentlyAddedCount > 0 && (
+                    <div className="text-xs text-green-600 font-medium">
+                      ✅ 已生成 {recentlyAddedCount} 条数据
+                    </div>
+                  )}
+                  {!cloudTemplateName && (
+                    <div className="text-xs text-orange-600">
+                      💡 请先选择一个模板
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
 
-          {/* 生成数量选择器 */}
-          {showCountSelector && (
-            <Card className="mb-6 border-2 border-blue-400 shadow-lg">
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="text-lg font-medium text-gray-800 mb-4">选择需要生成的文档数量</div>
-                  <div className="flex items-center justify-center gap-4">
-                    <label className="text-sm font-medium text-gray-700">数量：</label>
-                    <Select
-                      value={templateCount === 0 ? 'custom' : templateCount}
-                      onChange={(value) => {
-                        if (value === 'custom') {
-                          setTemplateCount(0);
-                        } else {
-                          setTemplateCount(value as number);
-                          setCustomCount('');
-                        }
-                      }}
-                      className="w-32"
-                      options={[
-                        { label: '1 个', value: 1 },
-                        { label: '2 个', value: 2 },
-                        { label: '3 个', value: 3 },
-                        { label: '5 个', value: 5 },
-                        { label: '10 个', value: 10 },
-                        { label: '20 个', value: 20 },
-                        { label: '50 个', value: 50 },
-                        { label: '自定义', value: 'custom' },
-                      ]}
-                    />
-                    {templateCount === 0 && (
-                      <Input
-                        type="number"
-                        min={1}
-                        max={1000}
-                        value={customCount}
-                        onChange={(e) => setCustomCount(e.target.value)}
-                        placeholder="输入数量"
-                        className="w-32"
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-center gap-3">
-                  <Button onClick={() => {
-                    setShowCountSelector(false);
-                    setTemplateCount(1);
-                    setCustomCount('');
-                  }}>取消</Button>
-                  <Button 
-                    type="primary" 
-                    onClick={generateTemplates} 
-                    loading={isAutoConfiguring}
-                    disabled={templateCount === 0 && !customCount}
-                  >
-                    生成配置模板
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* 数据导入与编辑 */}
-          <Card title="数据导入与编辑" className="mb-6">
+          {/* 字段配置区域 */}
+          {fields.length > 0 && (
+            <Card title="字段配置" className="mb-6">
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="text-sm text-gray-700">
                     <div className="font-medium mb-2">使用说明：</div>
                     <div className="text-xs text-gray-600 space-y-1">
-                      <div>💡 点击&quot;自动配置&quot;后会自动生成模板并显示在下方</div>
-                      <div>💡 在JSON区域编辑数据，填写各字段的值</div>
-                      <div>💡 编辑完成后点击&quot;更新数据&quot;应用修改</div>
-                      <div>💡 每个 {'{}'} 为一条记录，字段格式：&quot;字段名&quot;: &quot;值&quot;</div>
+                      <div>💡 为每个字段输入多条值，每行一个值</div>
+                      <div>💡 系统会自动组合生成多条数据记录</div>
+                      <div>💡 如果某个字段值较少，会自动重复使用最后一个值</div>
+                      <div>💡 编辑完成后点击"生成数据"按钮</div>
                     </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    编辑JSON数据 {batchDataList.length > 0 && <span className="text-blue-600">（当前已有 {batchDataList.length} 条数据）</span>}
-                  </label>
-                  <Input.TextArea value={batchInputText} onChange={(e) => setBatchInputText(e.target.value)} placeholder={`粘贴或编辑JSON格式的数据，例如：\n{"name": "张三", "age": 25},\n{"name": "李四", "age": 30}`} rows={8} />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {fields.map((field) => (
+                    <div key={field.name} className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        {field.name}
+                        <span className="text-xs text-gray-500 ml-2">
+                          ({field.values.split('\n').filter(v => v.trim()).length} 个值)
+                        </span>
+                      </label>
+                      <Input.TextArea
+                        value={field.values}
+                        onChange={(e) => updateFieldValues(field.name, e.target.value)}
+                        placeholder={`输入${field.name}的值\n每行一个值\n例如：\n张三\n李四\n王五`}
+                        rows={6}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  ))}
                 </div>
-                <div className="flex gap-2 justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">导入模式：</span>
-                    <Select
-                      value={importMode}
-                      onChange={(value) => setImportMode(value)}
-                      className="w-32"
-                      size="small"
-                      options={[
-                        { label: '替换数据', value: 'replace' },
-                        { label: '追加数据', value: 'append' },
-                      ]}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={() => setBatchInputText('')}>清空编辑区</Button>
-                    <Button type="primary" icon={<UploadOutlined />} onClick={parseJsonData}>
-                      {importMode === 'replace' ? '更新数据' : '追加数据'}
-                    </Button>
-                  </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button onClick={() => {
+                    setFields([]);
+                    setBatchDataList([]);
+                    setRecentlyAddedCount(0);
+                  }}>
+                    清空字段
+                  </Button>
+                  <Button type="primary" icon={<SettingOutlined />} onClick={generateDataFromFields}>
+                    生成数据
+                  </Button>
                 </div>
               </div>
             </Card>
+          )}
 
           {/* 数据列表 */}
           {batchDataList.length > 0 && (
