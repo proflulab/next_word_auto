@@ -352,7 +352,7 @@ export default function BatchPage() {
                       <div>💡 为每个字段输入多条值，每行一个值</div>
                       <div>💡 系统会自动组合生成多条数据记录</div>
                       <div>💡 如果某个字段值较少，会自动重复使用最后一个值</div>
-                      <div>💡 编辑完成后点击"生成数据"按钮</div>
+                      <div>💡 编辑完成后点击&ldquo;生成数据&rdquo;按钮</div>
                     </div>
                   </div>
                 </div>

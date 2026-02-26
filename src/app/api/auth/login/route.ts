@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     } else {
       return NextResponse.json({ success: false, message: 'Incorrect password' }, { status: 401 });
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, message: 'An error occurred' }, { status: 500 });
   }
 }

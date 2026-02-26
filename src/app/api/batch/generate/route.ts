@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     let items: BatchItem[];
     try {
       items = JSON.parse(itemsString);
-    } catch (e) {
+    } catch {
       return NextResponse.json({ error: 'items 参数格式错误' }, { status: 400 });
     }
 
