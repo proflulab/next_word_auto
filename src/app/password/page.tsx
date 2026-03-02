@@ -41,8 +41,7 @@ export default function PasswordPage() {
             } else {
                 setError(data.message || "Incorrect password. Please try again.");
             }
-        } catch (err) {
-            console.error('Login error:', err);
+        } catch {
             setError("An error occurred while trying to log in. Please try again.");
         }
     };
