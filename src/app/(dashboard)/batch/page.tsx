@@ -215,27 +215,41 @@ export default function BatchPage() {
       
       const selectedTemplate = cloudTemplates.find(t => t.name === cloudTemplateName);
       if (!selectedTemplate) throw new Error('模板不存在');
+      
+      // 获取模板文件
       const templateResponse = await fetch(selectedTemplate.url);
       if (!templateResponse.ok) throw new Error(`获取模板失败: ${templateResponse.statusText}`);
       const templateBlob = await templateResponse.blob();
-      const templateFile = new File([templateBlob], cloudTemplateName, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const templateFile = new File([templateBlob], cloudTemplateName, { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+      // 使用前端循环调用 /api/document（与动态文档生成器相同的方式）
       const zip = new JSZip();
       const timestamp = Date.now();
       let successCount = 0;
+      
       for (let i = 0; i < batchDataList.length; i++) {
         const data = batchDataList[i];
         try {
           console.log(`生成文档 ${i + 1}/${batchDataList.length}，数据:`, data);
+          
           const formDataToSend = new FormData();
           formDataToSend.append('data', JSON.stringify(data));
           formDataToSend.append('template', templateFile);
-          formDataToSend.append('format', format);
-          const response = await fetch('/api/document', { method: 'POST', body: formDataToSend });
+          
+          // 使用与动态文档生成器相同的 API 调用方式
+          const response = await fetch(`/api/document?format=${format}`, {
+            method: 'POST',
+            body: formDataToSend
+          });
+          
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`API错误响应:`, errorText);
             throw new Error(`生成文档失败: ${response.statusText}`);
           }
+          
           const blob = await response.blob();
           const fileExtension = format === 'pdf' ? 'pdf' : 'docx';
           const fileName = `document_${timestamp}_${String(i + 1).padStart(4, '0')}.${fileExtension}`;
@@ -246,14 +260,18 @@ export default function BatchPage() {
           message.warning(`文档 ${i + 1} 生成失败，继续处理其他文档`);
         }
       }
+      
       if (successCount === 0) throw new Error('所有文档生成都失败了');
+      
+      // 打包并下载
       const zipBuffer = await zip.generateAsync({ type: 'blob' });
       const fileName = `batch_documents_${timestamp}.zip`;
       saveAs(zipBuffer, fileName);
+      
       const formatName = format.toUpperCase();
-      message.success(`${formatName}文档生成成功！成功生成 ${successCount}/${batchDataList.length} 个文档，已自动下载`);
+      message.success(`${formatName}文档批量生成成功！成功生成 ${successCount}/${batchDataList.length} 个文档，已自动下载`);
     } catch (error) {
-      console.error('Error generating documents:', error);
+      console.error('批量生成文档失败:', error);
       message.error(error instanceof Error ? error.message : '文档生成失败，请重试');
     } finally {
       setLoading(false);
