@@ -71,6 +71,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         let data: DocumentData;
         try {
             data = JSON.parse(dataString);
+            console.log('接收到的数据:', data);
         } catch {
             return new NextResponse(JSON.stringify({ error: "data 参数格式错误，必须是有效的 JSON" }), {
                 status: 400,
@@ -89,9 +90,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         // 读取模板文件内容
         const templateBuffer = await fs.promises.readFile(templateFile.filepath);
+        console.log('模板文件大小:', templateBuffer.length);
 
         // 生成DOCX文档
+        console.log('开始生成文档，使用数据:', data);
         const docBuffer = await generateDocxBuffer(data, templateBuffer, 'buffer');
+        console.log('文档生成完成，大小:', docBuffer.length);
 
         // 使用格式处理器处理不同的输出格式
         const normalizedFormat = format.toLowerCase() as SupportedFormat;
