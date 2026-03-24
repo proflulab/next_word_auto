@@ -200,11 +200,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({
       file_url: blob.url,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       {
         error: "文档生成失败",
-        detail: error?.message || String(error),
+        detail: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
