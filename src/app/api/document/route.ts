@@ -16,7 +16,7 @@ import { generateDocxBuffer, type DocumentData } from "@/services/docxTemplateSe
 import formidable from "formidable";
 import { Readable } from "stream";
 import fs from "fs";
-import { put } from "@vercel/blob"; // ✅【新增1】
+import { put } from "@vercel/blob"; // 【新增】
 
 // 定义支持的格式类型
 type SupportedFormat = 'docx' | 'pdf' | 'png' | 'jpg' | 'jpeg';
@@ -49,7 +49,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         const form = formidable({
             multiples: false,
             keepExtensions: true,
-            maxFileSize: 10 * 1024 * 1024,
+            maxFileSize: 10 * 1024 * 1024, // 10MB
         });
 
         const [fields, files] = await form.parse(mockRequest);
@@ -68,7 +68,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         try {
             data = JSON.parse(dataString);
         } catch {
-            return new NextResponse(JSON.stringify({ error: "data 参数格式错误" }), {
+            return new NextResponse(JSON.stringify({ error: "data 参数格式错误，必须是有效的 JSON" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
@@ -92,6 +92,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             return new NextResponse(
                 JSON.stringify({
                     error: `不支持的格式: ${format}`,
+                    supportedFormats: Object.keys(formatHandlers)
                 }),
                 {
                     status: 400,
@@ -105,10 +106,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         try {
             const processedBuffer = await handler.process(docBuffer);
 
-            // ✅【新增2：上传到云】
+            // 【新增：上传到云】
             const token = process.env.BLOB_READ_WRITE_TOKEN;
             if (!token) {
-                return NextResponse.json({ error: "缺少 BLOB_READ_WRITE_TOKEN" }, { status: 500 });
+                return new NextResponse(JSON.stringify({ error: "缺少 BLOB_READ_WRITE_TOKEN" }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json" },
+                });
             }
 
             const fileName = `document_${Date.now()}.${handler.fileExtension}`;
@@ -119,28 +123,33 @@ export async function POST(request: Request): Promise<NextResponse> {
                 token,
             });
 
-            // ✅【新增3：返回 URL 而不是文件】
+            // 【替换：原来这里是返回文件流，现在改成返回URL】
             return NextResponse.json({
                 file_url: blob.url,
             });
 
-        } catch (error: unknown) {
+        } catch (error) {
             console.error(`${format.toUpperCase()} 转换失败:`, error);
-            return NextResponse.json(
-                { error: `${format.toUpperCase()} 转换失败` },
-                { status: 500 }
+            return new NextResponse(
+                JSON.stringify({ error: `${format.toUpperCase()} 转换失败` }),
+                {
+                    status: 500,
+                    headers: { "Content-Type": "application/json" },
+                }
             );
         }
-    } catch (error: unknown) {
+    } catch (error) {
         console.error("文档生成失败:", error);
-        return NextResponse.json(
-            { error: "文档生成失败" },
-            { status: 500 }
-        );
+        return new NextResponse(JSON.stringify({ error: "文档生成失败" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+        });
     }
 }
 
-// 格式处理器映射（完全没动）
+
+
+// 格式处理器映射
 const formatHandlers: Record<SupportedFormat, FormatHandler> = {
     docx: {
         contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -151,28 +160,48 @@ const formatHandlers: Record<SupportedFormat, FormatHandler> = {
         contentType: 'application/pdf',
         fileExtension: 'pdf',
         process: async (docBuffer: Buffer) => {
-            return await convertDocxToPdf(docBuffer);
+            try {
+                return await convertDocxToPdf(docBuffer);
+            } catch (error) {
+                console.error('PDF 转换失败:', error);
+                throw new Error('PDF 转换失败');
+            }
         },
     },
     png: {
         contentType: 'image/png',
         fileExtension: 'png',
         process: async (docBuffer: Buffer) => {
-            return await convertDocxToImage(docBuffer, 'png');
+            try {
+                return await convertDocxToImage(docBuffer, 'png');
+            } catch (error) {
+                console.error('PNG 转换失败:', error);
+                throw new Error('PNG 转换失败');
+            }
         },
     },
     jpg: {
         contentType: 'image/jpeg',
         fileExtension: 'jpg',
         process: async (docBuffer: Buffer) => {
-            return await convertDocxToImage(docBuffer, 'jpg');
+            try {
+                return await convertDocxToImage(docBuffer, 'jpg');
+            } catch (error) {
+                console.error('JPG 转换失败:', error);
+                throw new Error('JPG 转换失败');
+            }
         },
     },
     jpeg: {
         contentType: 'image/jpeg',
         fileExtension: 'jpeg',
         process: async (docBuffer: Buffer) => {
-            return await convertDocxToImage(docBuffer, 'jpeg');
+            try {
+                return await convertDocxToImage(docBuffer, 'jpeg');
+            } catch (error) {
+                console.error('JPEG 转换失败:', error);
+                throw new Error('JPEG 转换失败');
+            }
         },
     },
 };
