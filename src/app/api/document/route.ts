@@ -4,9 +4,9 @@
  * @LastEditors: 杨仕明 shiming.y@qq.com
  * @LastEditTime: 2025-08-19 19:09:58
  * @FilePath: /next_word_auto/src/app/api/document/route.ts
- * @Description: 
- * 
- * Copyright (c) 2025 by ${git_name_email}, All Rights Reserved. 
+ * @Description:
+ *
+ * Copyright (c) 2025 by ${git_name_email}, All Rights Reserved.
  */
 
 import { NextResponse } from "next/server";
@@ -55,6 +55,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         const [fields, files] = await form.parse(mockRequest);
 
         const format = Array.isArray(fields.format) ? fields.format[0] : fields.format || 'docx';
+
+        // ✅ 新增：控制返回类型
+        const returnType = Array.isArray(fields.returnType)
+            ? fields.returnType[0]
+            : fields.returnType || 'file'; // 默认返回文件
 
         const dataString = Array.isArray(fields.data) ? fields.data[0] : fields.data;
         if (!dataString) {
@@ -106,7 +111,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         try {
             const processedBuffer = await handler.process(docBuffer);
 
-            // 【新增：上传到云】
+            // ✅ 优先返回文件流（默认行为）
+            if (returnType === 'file') {
+                return new NextResponse(new Uint8Array(processedBuffer), {
+                    headers: {
+                        "Content-Type": handler.contentType,
+                        "Content-Disposition": `attachment; filename="document.${handler.fileExtension}"`,
+                    },
+                });
+            }
+
+            // ✅ 否则返回 URL（飞书用）
             const token = process.env.BLOB_READ_WRITE_TOKEN;
             if (!token) {
                 return new NextResponse(JSON.stringify({ error: "缺少 BLOB_READ_WRITE_TOKEN" }), {
@@ -123,7 +138,6 @@ export async function POST(request: Request): Promise<NextResponse> {
                 token,
             });
 
-            // 【替换：原来这里是返回文件流，现在改成返回URL】
             return NextResponse.json({
                 file_url: blob.url,
             });
